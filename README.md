@@ -32,7 +32,7 @@ All skills are authored in English. Japanese walkthroughs of the skill set are p
 Add the plugin's marketplace to Claude Code, then install:
 
 ```bash
-/plugin marketplace add <path-or-URL-to-this-directory>
+/plugin marketplace add oreguchi/vb-winforms-skills
 /plugin install vb-winforms-skills@vb-winforms-skills-marketplace
 ```
 
@@ -91,7 +91,7 @@ MIT
 Claude Code にプラグインのマーケットプレイスを追加してからインストールします:
 
 ```bash
-/plugin marketplace add <このディレクトリへのパスまたは URL>
+/plugin marketplace add oreguchi/vb-winforms-skills
 /plugin install vb-winforms-skills@vb-winforms-skills-marketplace
 ```
 

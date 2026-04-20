@@ -1,0 +1,19 @@
+{
+  "name": "vb-winforms-skills",
+  "description": "Claude Code skills for VB.NET Windows Forms: project setup, MVP patterns, DI, async/concurrency, and modern coding standards on .NET 8/9.",
+  "version": "1.0.0",
+  "author": {
+    "name": "oreguchi"
+  },
+  "license": "MIT",
+  "keywords": [
+    "vb.net",
+    "windows-forms",
+    "winforms",
+    "dependency-injection",
+    "async",
+    "coding-standards",
+    "mvp",
+    "dotnet"
+  ]
+}

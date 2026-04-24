@@ -1,18 +1,14 @@
 {
-  "name": "vb-winforms-skills-marketplace",
-  "description": "Marketplace manifest for the vb-winforms-skills Claude Code plugin.",
+  "name": "vb-winforms-skills-v2-local",
   "owner": {
-    "name": "oreguchi"
+    "name": "oreguchi",
+    "email": "228712732+oreguchi@users.noreply.github.com"
   },
   "plugins": [
     {
       "name": "vb-winforms-skills",
-      "description": "Claude Code skills for VB.NET Windows Forms: project setup, MVP patterns, DI, async/concurrency, and modern coding standards on .NET 8/9.",
-      "version": "1.0.0",
       "source": "./",
-      "author": {
-        "name": "oreguchi"
-      }
+      "description": "VB.NET/.NET 向け Claude Code スキル集 (2.0.0)。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理、DI パターンを 5 つのスキルで提供。"
     }
   ]
 }

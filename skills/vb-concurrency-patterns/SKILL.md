@@ -1,99 +1,91 @@
 ---
 name: vb-concurrency-patterns
-description: "Choosing the right concurrency abstraction in a VB.NET Windows Forms application - from Async/Await for I/O to Channels for producer/consumer, with UI thread marshalling, IProgress(Of T), and CancellationTokenSource wired to a Cancel button. Avoid SyncLock and manual synchronization unless absolutely necessary."
-compatibility: "Applies to VB.NET projects on .NET or .NET Framework with async/await support."
+description: VB.NETにおける並行処理抽象の選択指針。I/OバウンドにはAsync/Await、プロデューサー/コンシューマーにはChannel(Of T)、ステートフルなエンティティ管理にはAkka.NETを使う。SyncLockや手動同期は極力避ける。
+invocable: false
 ---
 
-# VB.NET WinForms Concurrency: Choosing the Right Tool
+# .NET 並行処理: 適切なツールの選択
 
-## When to Use This Skill
+## このスキルを使う場面
 
-Use this skill when:
-- Deciding how to handle concurrent operations in a VB.NET Windows Forms application
-- Evaluating whether to use Async/Await, Channels, or other abstractions
-- Tempted to use `SyncLock`, semaphores, or other synchronization primitives
-- Need to process streams of data with backpressure, batching, or debouncing
-- Reporting progress from a background operation to a Form
-- Wiring a Cancel button to cancel a running operation
-- Managing state across multiple concurrent entities
+次の場面で使う。
+- VB.NET での並行処理の方式を決定する
+- Async/Await、Channel、Akka.NET、その他の抽象のどれを使うか評価する
+- SyncLock、セマフォ、その他の同期プリミティブを使おうとしている
+- バックプレッシャー、バッチ処理、デバウンスを伴うデータストリームを処理する
+- 複数の並行エンティティにまたがる状態を管理する
 
-## Reference Files
+## 参考ファイル
 
-- [advanced-concurrency.md](references/advanced-concurrency.md): Akka.NET Streams, Reactive Extensions, Akka.NET Actors (entity-per-actor, state machines), and async local function patterns translated to VB.NET
+- [advanced-concurrency.md](advanced-concurrency.md): Akka.NET Streams、Reactive Extensions、Akka.NET アクター（エンティティ単位アクター、ステートマシン、クラスターシャーディング）、非同期ローカル関数パターン
 
-## The Philosophy
+## 基本方針
 
-**Start simple, escalate only when needed.**
+**シンプルから始め、必要なときだけ上位に移行する。**
 
-Most concurrency problems in a WinForms LOB app can be solved with `Async/Await` plus `IProgress(Of T)` and a `CancellationTokenSource`. Only reach for more sophisticated tools when you have a specific need those cannot address cleanly.
+ほとんどの並行処理問題は `Async`/`Await` で解決できる。より高度なツールに手を伸ばすのは、`Async`/`Await` では対応できない具体的な要件がある場合だけにする。
 
-**Try to avoid shared mutable state.** The best way to handle concurrency is to design it away. Immutable data, message passing, and isolated state (like actors) eliminate entire categories of bugs.
+**共有可変状態を避けるよう設計する。** 並行処理に最も効果的なのは、設計によって問題を解消することだ。イミュータブルなデータ、メッセージパッシング、アクターによる状態の隔離は、バグのカテゴリーそのものを排除する。
 
-**Locks should be the exception, not the rule.** When you can't avoid shared mutable state:
-1. **First choice:** Redesign to avoid it (immutability, message passing, actor isolation)
-2. **Second choice:** Use `System.Collections.Concurrent` (`ConcurrentDictionary`, etc.)
-3. **Third choice:** Use `Channel(Of T)` to serialize access through message passing
-4. **Last resort:** Use `SyncLock` for simple, short-lived critical sections
+**SyncLock は例外であって、規則ではない。** 共有可変状態をどうしても避けられない場合:
+1. **第一選択:** 設計を見直して回避する（イミュータブル化、メッセージパッシング、アクターによる隔離）
+2. **第二選択:** `System.Collections.Concurrent`（ConcurrentDictionary など）を使う
+3. **第三選択:** `Channel(Of T)` を使ってメッセージパッシングでアクセスをシリアル化する
+4. **最終手段:** 単純かつ短命なクリティカルセクションに限り `SyncLock` を使う
 
 ---
 
-## Decision Tree
+## 判断ツリー
 
 ```
-What are you trying to do?
+何をしたいか？
 │
-├─► Wait for I/O (HTTP, database, file, serial port, SPEL+ command)?
-│   └─► Use Async/Await
+├─► I/O待機（HTTP、データベース、ファイル）?
+│   └─► Async/Await を使う
 │
-├─► Process a collection in parallel (CPU-bound)?
-│   └─► Use Parallel.ForEachAsync
+├─► コレクションを並列処理（CPUバウンド）?
+│   └─► Parallel.ForEachAsync を使う
 │
-├─► Producer/consumer pattern (work queue)?
-│   └─► Use System.Threading.Channels
+├─► プロデューサー/コンシューマーパターン（ワークキュー）?
+│   └─► System.Threading.Channels を使う
 │
-├─► Report progress from background work to a Form?
-│   └─► Use IProgress(Of T) + Progress(Of T)
+├─► UIイベント処理（デバウンス、スロットル、結合）?
+│   └─► Reactive Extensions (Rx) を使う
 │
-├─► Let the user cancel a long-running operation with a button?
-│   └─► Use CancellationTokenSource tied to the Cancel button
+├─► サーバーサイドのストリーム処理（バックプレッシャー、バッチ）?
+│   └─► Akka.NET Streams を使う
 │
-├─► Update UI from non-UI thread (timer, worker thread, serial callback)?
-│   └─► Use Control.Invoke / Control.BeginInvoke (or SynchronizationContext)
+├─► 複雑な遷移を持つステートマシン?
+│   └─► Akka.NET アクター（Become パターン）を使う
 │
-├─► UI event composition (debounce, throttle, combine)?
-│   └─► Use Reactive Extensions (Rx)
+├─► 多数の独立したエンティティの状態管理?
+│   └─► Akka.NET アクター（エンティティ単位アクター）を使う
 │
-├─► Server-side stream processing (backpressure, batching)?
-│   └─► Use Akka.NET Streams
+├─► 複数の非同期操作を協調させる?
+│   └─► Task.WhenAll / Task.WhenAny を使う
 │
-├─► State machines with complex transitions?
-│   └─► Use Akka.NET Actors (Become pattern)
-│
-├─► Coordinate multiple async operations?
-│   └─► Use Task.WhenAll / Task.WhenAny
-│
-└─► None of the above fits?
-    └─► Ask yourself: "Do I really need shared mutable state?"
-        ├─► Yes → Consider redesigning to avoid it
-        └─► Truly unavoidable → Use Channels or Actors to serialize access
+└─► 上記のどれにも当てはまらない?
+    └─► 自問する: 「本当に共有可変状態が必要か？」
+        ├─► Yes → 設計を見直して回避することを検討する
+        └─► 本当に避けられない → Channel またはアクターでアクセスをシリアル化する
 ```
 
 ---
 
-## Level 1: Async/Await (Default Choice)
+## レベル 1: Async/Await（デフォルトの選択）
 
-**Use for:** I/O-bound operations, non-blocking waits, most everyday concurrency.
+**用途:** I/O バウンド処理、ノンブロッキングな待機、日常的な並行処理のほとんど。
 
-```vb
-' Simple async I/O
+```vbnet
+' シンプルな非同期 I/O
 Public Async Function GetOrderAsync(orderId As String, ct As CancellationToken) As Task(Of Order)
     Dim order = Await _database.GetAsync(orderId, ct)
     Dim customer = Await _customerService.GetAsync(order.CustomerId, ct)
-    order.Customer = customer
-    Return order
+    ' VB.NET に with 式はないため、新しいインスタンスを作成して設定する
+    Return New Order With {.Id = order.Id, .Customer = customer}
 End Function
 
-' Parallel async operations (when independent)
+' 非同期操作の並列実行（互いに独立している場合）
 Public Async Function LoadDashboardAsync(userId As String, ct As CancellationToken) As Task(Of Dashboard)
     Dim ordersTask = _orderService.GetRecentOrdersAsync(userId, ct)
     Dim notificationsTask = _notificationService.GetUnreadAsync(userId, ct)
@@ -102,21 +94,21 @@ Public Async Function LoadDashboardAsync(userId As String, ct As CancellationTok
     Await Task.WhenAll(ordersTask, notificationsTask, statsTask)
 
     Return New Dashboard(
-        orders:=Await ordersTask,
-        notifications:=Await notificationsTask,
-        stats:=Await statsTask)
+        Await ordersTask,
+        Await notificationsTask,
+        Await statsTask)
 End Function
 ```
 
-**Key principles:** Always accept `CancellationToken`. Use `ConfigureAwait(False)` in library code. Don't block on async code (no `.Result` or `.Wait()`).
+**主要原則:** 常に `CancellationToken` を受け取る。ライブラリコードでは `ConfigureAwait(False)` を使う。非同期コードをブロックしない。
 
 ---
 
-## Level 2: Parallel.ForEachAsync (CPU-Bound Parallelism)
+## レベル 2: Parallel.ForEachAsync（CPUバウンドの並列処理）
 
-**Use for:** Processing collections in parallel when work is CPU-bound or you need controlled concurrency.
+**用途:** CPU バウンド処理、または並行数を制御しながらコレクションを並列処理する場合。
 
-```vb
+```vbnet
 Public Async Function ProcessOrdersAsync(
     orders As IEnumerable(Of Order),
     ct As CancellationToken) As Task
@@ -133,42 +125,49 @@ Public Async Function ProcessOrdersAsync(
 End Function
 ```
 
-**When NOT to use:** Pure I/O operations, when order matters, when you need backpressure.
+**使ってはいけない場面:** 純粋な I/O 処理、順序が重要な場合、バックプレッシャーが必要な場合。
 
 ---
 
-## Level 3: System.Threading.Channels (Producer/Consumer)
+## レベル 3: System.Threading.Channels（プロデューサー/コンシューマー）
 
-**Use for:** Work queues, producer/consumer patterns, decoupling producers from consumers (e.g. a robot controller pushing data points while a background worker writes them to disk).
+**用途:** ワークキュー、プロデューサー/コンシューマーパターン、プロデューサーとコンシューマーの分離。
 
-```vb
-Imports System.Threading.Channels
-
+```vbnet
 Public Class OrderProcessor
     Private ReadOnly _channel As Channel(Of Order)
 
     Public Sub New()
-        _channel = Channel.CreateBounded(Of Order)(
-            New BoundedChannelOptions(100) With {
-                .FullMode = BoundedChannelFullMode.Wait
-            })
+        _channel = Channel.CreateBounded(Of Order)(New BoundedChannelOptions(100) With {
+            .FullMode = BoundedChannelFullMode.Wait
+        })
     End Sub
 
-    ' Producer
+    ' プロデューサー
     Public Async Function EnqueueOrderAsync(order As Order, ct As CancellationToken) As Task
         Await _channel.Writer.WriteAsync(order, ct)
     End Function
 
-    ' Consumer (run as background task)
-    ' NOTE: VB.NET has no "Await For Each". Use GetAsyncEnumerator + MoveNextAsync.
+    ' コンシューマー（バックグラウンドタスクとして実行）
+    ' 注意: VB.NET は Await For Each 構文をサポートしないため、
+    ' IAsyncEnumerator を手動で操作する
     Public Async Function ProcessOrdersAsync(ct As CancellationToken) As Task
-        Dim reader = _channel.Reader
-        While Await reader.WaitToReadAsync(ct)
-            Dim order As Order = Nothing
-            While reader.TryRead(order)
-                Await ProcessOrderAsync(order, ct)
+        Dim enumerator = _channel.Reader.ReadAllAsync(ct).GetAsyncEnumerator(ct)
+        ' VB.NET は Finally 内に Await を書けない（BC36943）。
+        ' 例外時も DisposeAsync を呼ぶために Try/Catch で例外を捕捉し、
+        ' Try 外で Await DisposeAsync を呼んだ後に再 throw する 4-block パターンを使う。
+        Dim thrown As Exception = Nothing
+        Try
+            While Await enumerator.MoveNextAsync()
+                Await ProcessOrderAsync(enumerator.Current, ct)
             End While
-        End While
+        Catch ex As Exception
+            thrown = ex
+        End Try
+        Await enumerator.DisposeAsync()  ' outside Try/Catch — Await is allowed here
+        If thrown IsNot Nothing Then
+            Throw thrown
+        End If
     End Function
 
     Public Sub Complete()
@@ -177,223 +176,28 @@ Public Class OrderProcessor
 End Class
 ```
 
-**Channels are good for:** Decoupling producer/consumer speeds, buffering with backpressure, fan-out to workers, background queues.
+**Channel が適している場面:** 処理速度の差の吸収、バックプレッシャーを持つバッファリング、ワーカーへのファンアウト、バックグラウンドキュー。
 
-**Channels are NOT good for:** Complex stream operations (batching, windowing), stateful per-entity processing, sophisticated supervision.
-
-**VB.NET note:** C# consumers typically use `Await foreach (var x in reader.ReadAllAsync(ct))`. VB.NET has no `Await For Each`, so the idiomatic consumer pattern is the `WaitToReadAsync` + `TryRead` loop shown above. Authoring async iterators (`Yield Return` in an `IAsyncEnumerable`) is C#-only; consume them in VB by calling `GetAsyncEnumerator` and driving `MoveNextAsync` in a `While` loop.
+**Channel が適していない場面:** 複雑なストリーム操作（バッチ、ウィンドウ処理）、エンティティ単位のステートフル処理、高度なスーパービジョン。
 
 ---
 
-## WinForms Specifics
+## レベル 4+: Akka.NET Streams、Reactive Extensions、アクター
 
-### UI Thread Marshalling
+ストリーム処理、UI イベント合成、ステートフルなエンティティ管理などの高度なシナリオは [advanced-concurrency.md](advanced-concurrency.md) を参照する。
 
-Windows Forms has a single UI thread. Only the UI thread may touch UI controls. Violating this raises a `InvalidOperationException` ("Cross-thread operation not valid").
+**Akka.NET Streams** はサーバーサイドのバッチ処理、スロットル、バックプレッシャーに優れる。**Reactive Extensions** は UI イベント合成に最適だ。**Akka.NET アクター** はエンティティ単位アクターパターン、`Become()` を使ったステートマシン、Cluster Sharding を用いた分散システムを扱う。
 
-Good news: `Async/Await` in WinForms captures the current `SynchronizationContext` and returns to the UI thread automatically. The code below is safe:
-
-```vb
-' Inside a Form — runs on the UI thread
-Private Async Sub btnLoad_Click(sender As Object, e As EventArgs) Handles btnLoad.Click
-    btnLoad.Enabled = False
-    Try
-        ' Await captures the UI SynchronizationContext;
-        ' when the Task completes, execution resumes on the UI thread.
-        Dim data = Await _service.LoadAsync()
-        lblResult.Text = data.Summary   ' Safe: back on the UI thread.
-    Finally
-        btnLoad.Enabled = True
-    End Try
-End Sub
-```
-
-When the work is **not** driven by `Async/Await` (e.g. a `System.Threading.Timer` callback, a serial-port `DataReceived` event, or a SPEL+ event callback on a worker thread), you must marshal explicitly:
-
-```vb
-' Called from a non-UI thread (timer, serial port, etc.)
-Private Sub OnSensorReading(value As Double)
-    If lblSensor.InvokeRequired Then
-        lblSensor.BeginInvoke(Sub() lblSensor.Text = value.ToString("F3"))
-    Else
-        lblSensor.Text = value.ToString("F3")
-    End If
-End Sub
-```
-
-- `Control.Invoke` — synchronous; blocks the caller until the UI processes the delegate.
-- `Control.BeginInvoke` — fire-and-forget; preferred for high-frequency updates (sensor streams, log messages).
-- `SynchronizationContext.Current` — captured on the UI thread; use `.Post` (async) or `.Send` (sync) from worker code that doesn't hold a `Control` reference.
-
-### Library code: ConfigureAwait(False)
-
-In a **Form**, you want to return to the UI thread after `Await` — do *not* use `ConfigureAwait(False)`.
-
-In a **class library** called from a Form, prefer `ConfigureAwait(False)` on every `Await` so the library doesn't depend on a particular synchronization context:
-
-```vb
-' Library code
-Public Async Function LoadAsync() As Task(Of Data)
-    Dim json = Await _http.GetStringAsync(_url).ConfigureAwait(False)
-    Return JsonSerializer.Deserialize(Of Data)(json)
-End Function
-```
-
-### IProgress(Of T) for Progress Reporting
-
-`IProgress(Of T)` is the standard way to report progress from background work to a Form. `Progress(Of T)` captures the UI `SynchronizationContext` when constructed, so the callback fires on the UI thread — no manual `Invoke` needed.
-
-```vb
-' Service (library-style): takes an IProgress(Of T).
-Public Async Function ProcessFilesAsync(
-    files As IReadOnlyList(Of String),
-    progress As IProgress(Of Integer),
-    ct As CancellationToken) As Task
-
-    For i = 0 To files.Count - 1
-        ct.ThrowIfCancellationRequested()
-        Await ProcessOneAsync(files(i), ct).ConfigureAwait(False)
-        progress?.Report(CInt((i + 1) / files.Count * 100))
-    Next
-End Function
-
-' Form: constructs Progress(Of T) on the UI thread.
-Private Async Sub btnStart_Click(sender As Object, e As EventArgs) Handles btnStart.Click
-    Dim reporter As IProgress(Of Integer) = New Progress(Of Integer)(
-        Sub(pct)
-            ' Runs on the UI thread. Safe to touch controls.
-            progressBar1.Value = pct
-            lblPercent.Text = $"{pct}%"
-        End Sub)
-
-    Await _service.ProcessFilesAsync(_files, reporter, CancellationToken.None)
-End Sub
-```
-
-**Report complex state** (percent + message + ETA) with a small `Structure` or `Class` parameter instead of scalar `Integer`.
-
-### Cancellation from a Cancel Button
-
-Wire a `CancellationTokenSource` to the Cancel button so the user can abort long-running work. Dispose it when the Form closes or after the operation completes.
-
-```vb
-Public Class ImportForm
-    Private _cts As CancellationTokenSource
-
-    Private Async Sub btnStart_Click(sender As Object, e As EventArgs) Handles btnStart.Click
-        _cts = New CancellationTokenSource()
-        btnStart.Enabled = False
-        btnCancel.Enabled = True
-        Try
-            Await _service.ImportAsync(_cts.Token)
-            lblStatus.Text = "Done."
-        Catch ex As OperationCanceledException
-            lblStatus.Text = "Cancelled."
-        Catch ex As Exception
-            lblStatus.Text = $"Error: {ex.Message}"
-        Finally
-            btnStart.Enabled = True
-            btnCancel.Enabled = False
-            _cts?.Dispose()
-            _cts = Nothing
-        End Try
-    End Sub
-
-    Private Sub btnCancel_Click(sender As Object, e As EventArgs) Handles btnCancel.Click
-        _cts?.Cancel()
-    End Sub
-
-    Private Sub ImportForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
-        ' Cancel and dispose if the user closes the form mid-import.
-        _cts?.Cancel()
-        _cts?.Dispose()
-    End Sub
-End Class
-```
-
-**Inside the service**, honour the token:
-
-```vb
-Public Async Function ImportAsync(ct As CancellationToken) As Task
-    For Each row In _rows
-        ct.ThrowIfCancellationRequested()
-        Await _db.InsertAsync(row, ct).ConfigureAwait(False)
-    Next
-End Function
-```
-
-### Application.DoEvents is a Footgun
-
-Legacy WinForms code often uses `Application.DoEvents()` inside a tight loop to "keep the UI responsive." Don't.
-
-```vb
-' BAD: re-entrant message pump, partially-initialized state, hard-to-debug behaviour
-For i = 0 To 10000
-    Process(i)
-    Application.DoEvents()    ' pumps messages — user can click buttons mid-loop
-Next
-```
-
-```vb
-' GOOD: move the work off the UI thread with Async/Await (or Task.Run for CPU-bound),
-' and report progress + support cancellation.
-Private Async Sub btnProcess_Click(sender As Object, e As EventArgs) Handles btnProcess.Click
-    Dim progress As IProgress(Of Integer) = New Progress(Of Integer)(
-        Sub(pct) progressBar1.Value = pct)
-
-    Await Task.Run(
-        Sub()
-            For i = 0 To 10000
-                Process(i)
-                progress.Report(CInt(i / 10000.0 * 100))
-            Next
-        End Sub)
-End Sub
-```
-
-`Application.DoEvents` pumps the message queue re-entrantly — users can click buttons, close the form, or trigger timers while your loop is half-done. Replace with proper `Async/Await` + `IProgress(Of T)` + `CancellationToken`.
-
-### Async Sub — Use Only for Event Handlers
-
-`Async Sub` (the VB equivalent of C# `async void`) does not return a `Task`, so the caller cannot `Await` it and unhandled exceptions crash the process. **Use `Async Sub` only for WinForms event handlers.** Everywhere else, return `Task` or `Task(Of T)`.
-
-```vb
-' OK: event handler
-Private Async Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnSave.Click
-    Try
-        Await SaveAsync()
-    Catch ex As Exception
-        MessageBox.Show(ex.Message)
-    End Try
-End Sub
-
-' BAD: fire-and-forget Async Sub as a general method
-Public Async Sub StartBackgroundWork()    ' exceptions here will crash the app
-    Await DoWorkAsync()
-End Sub
-
-' GOOD: return Task; let the caller decide how to handle it
-Public Async Function StartBackgroundWorkAsync() As Task
-    Await DoWorkAsync()
-End Function
-```
+なお、Akka.NET は VB.NET からも利用可能だが、C# と比較すると一部のイディオムは冗長になる場合がある。
 
 ---
 
-## Level 4+: Akka.NET Streams, Reactive Extensions, Actors
+## アンチパターン: 避けるべきもの
 
-For advanced scenarios requiring stream processing, UI event composition, or stateful entity management, see [advanced-concurrency.md](references/advanced-concurrency.md).
+### ビジネスロジックへの SyncLock の使用
 
-**Akka.NET Streams** excel at server-side batching, throttling, and backpressure. **Reactive Extensions** are ideal for UI event composition in WinForms (search-as-you-type, double-click detection, auto-save). **Akka.NET Actors** handle entity-per-actor patterns, state machines with `Become()`, and distributed systems via Cluster Sharding.
-
----
-
-## Anti-Patterns: What to Avoid
-
-### SyncLock for Business Logic
-
-```vb
-' BAD: using SyncLock to protect shared state
+```vbnet
+' 悪い例: 共有状態を保護するために SyncLock を使う
 Private ReadOnly _lock As New Object()
 Private _orders As New Dictionary(Of String, Order)()
 
@@ -404,127 +208,77 @@ Public Sub UpdateOrder(id As String, update As Action(Of Order))
     End SyncLock
 End Sub
 
-' GOOD: use an actor or Channel to serialize access,
-' or ConcurrentDictionary for simple key/value state.
+' 良い例: アクターまたは Channel を使ってアクセスをシリアル化する
 ```
 
-### Manual Thread Management
+### 手動のスレッド管理
 
-```vb
-' BAD: creating threads manually
-Dim t As New Thread(AddressOf ProcessOrders)
-t.Start()
+```vbnet
+' 悪い例: スレッドを手動で作成する
+Dim thread = New Thread(Sub() ProcessOrders())
+thread.Start()
 
-' GOOD: Task.Run or better abstractions
-' Keep a reference so exceptions are observed and cancellation can be coordinated.
-' Note: Task.Run is unnecessary for already-async methods — just invoke it directly.
-' (Wrapping an async method in Task.Run(Function() ...) returns Task(Of Task) and swallows exceptions.)
-Dim backgroundTask As Task = ProcessOrdersAsync(cancellationToken)
-
-' Elsewhere (form close or cancel):
-Try
-    Await backgroundTask
-Catch ex As OperationCanceledException
-    ' expected on cancel
-Catch ex As Exception
-    ' log / surface to user
-End Try
+' 良い例: Task.Run またはより高レベルな抽象を使う
+Dim ignored = Task.Run(Async Function() Await ProcessOrdersAsync(cancellationToken))
 ```
 
-Unobserved Task exceptions raise `TaskScheduler.UnobservedTaskException` and may crash on older runtimes. Always keep a reference and `Await` (or observe via `ContinueWith`) to handle failures.
+### 非同期コード内でのブロッキング
 
-### Blocking on Async Code (Deadlock Risk in WinForms!)
+```vbnet
+' 悪い例: 非同期処理をブロック待機する — デッドロックの危険！
+Dim result = GetDataAsync().Result
 
-```vb
-' BAD: blocking on async — classic WinForms deadlock
-Dim result = GetDataAsync().Result        ' UI thread blocked;
-                                          ' awaited continuation also wants the UI thread → deadlock
-GetDataAsync().Wait()                     ' same problem
-
-' GOOD: async all the way
+' 良い例: 非同期を末端まで貫く
 Dim result = Await GetDataAsync()
 ```
 
-### Shared Mutable State Without Protection
+### 保護なしの共有可変状態
 
-```vb
-' BAD: multiple tasks mutating a plain List
+```vbnet
+' 悪い例: 複数のタスクが共有状態を変更する
 Dim results As New List(Of Result)()
-Await Parallel.ForEachAsync(items,
-    Async Function(item, ct)
-        Dim r = Await ProcessAsync(item, ct)
-        results.Add(r)        ' Race condition!
-    End Function)
+Await Parallel.ForEachAsync(items, Async Function(item, ct)
+    Dim result = Await ProcessAsync(item, ct)
+    results.Add(result) ' 競合状態！
+End Function)
 
-' GOOD: ConcurrentBag (or collect Task results and combine at the end)
+' 良い例: ConcurrentBag を使う
 Dim results As New ConcurrentBag(Of Result)()
 ```
 
-### Application.DoEvents in a Loop
-
-See "Application.DoEvents is a Footgun" above.
-
 ---
 
-## Quick Reference: Which Tool When?
+## クイックリファレンス: どのツールをいつ使うか
 
-| Need | Tool | Example |
+| 要件 | ツール | 例 |
 |------|------|---------|
-| Wait for I/O | `Async/Await` | HTTP calls, database queries, serial port reads |
-| Parallel CPU work | `Parallel.ForEachAsync` | Image processing, calculations |
-| Work queue | `Channel(Of T)` | Background job processing |
-| Progress from background to UI | `IProgress(Of T)` + `Progress(Of T)` | Import/export progress bar |
-| User cancels running operation | `CancellationTokenSource` + Cancel button | Long imports, network calls |
-| Marshal to UI thread from worker | `Control.Invoke` / `BeginInvoke` | Serial-port `DataReceived`, timer callbacks |
-| UI events with debounce/throttle | Reactive Extensions | Search-as-you-type, auto-save |
-| Server-side batching/throttling | Akka.NET Streams | Event aggregation, rate limiting |
-| State machines | Akka.NET Actors | Payment flows, order lifecycles |
-| Entity state management | Akka.NET Actors | Order management, user sessions |
-| Fire multiple async ops | `Task.WhenAll` | Loading dashboard data |
-| Race multiple async ops | `Task.WhenAny` | Timeout with fallback |
-| Periodic work | `PeriodicTimer` | Health checks, polling |
+| I/O 待機 | `Async`/`Await` | HTTP 呼び出し、データベースクエリ |
+| CPU バウンドの並列処理 | `Parallel.ForEachAsync` | 画像処理、計算 |
+| ワークキュー | `Channel(Of T)` | バックグラウンドジョブ処理 |
+| デバウンス/スロットルを伴う UI イベント | Reactive Extensions | 検索候補表示、自動保存 |
+| サーバーサイドのバッチ/スロットル | Akka.NET Streams | イベント集約、レート制限 |
+| ステートマシン | Akka.NET アクター | 支払いフロー、注文ライフサイクル |
+| エンティティの状態管理 | Akka.NET アクター | 注文管理、ユーザーセッション |
+| 複数の非同期操作を起動 | `Task.WhenAll` | ダッシュボードデータの読み込み |
+| 複数の非同期操作を競争 | `Task.WhenAny` | タイムアウトとフォールバック |
+| 定期的な処理 | `PeriodicTimer` | ヘルスチェック、ポーリング |
 
 ---
 
-## The Escalation Path
+## エスカレーションパス
 
 ```
-Async/Await (start here)
+Async/Await（ここから始める）
     │
-    ├─► Need progress reporting? → IProgress(Of T)
+    ├─► 並列処理が必要? → Parallel.ForEachAsync
     │
-    ├─► Need cancellation? → CancellationTokenSource + Cancel button
+    ├─► プロデューサー/コンシューマーが必要? → Channel(Of T)
     │
-    ├─► Need parallelism? → Parallel.ForEachAsync
+    ├─► UI イベント合成が必要? → Reactive Extensions
     │
-    ├─► Need producer/consumer? → Channel(Of T)
+    ├─► サーバーサイドのストリーム処理が必要? → Akka.NET Streams
     │
-    ├─► Need UI event composition? → Reactive Extensions
-    │
-    ├─► Need server-side stream processing? → Akka.NET Streams
-    │
-    └─► Need state machines or entity management? → Akka.NET Actors
+    └─► ステートマシンまたはエンティティ管理が必要? → Akka.NET アクター
 ```
 
-**Only escalate when you have a concrete need.** Don't reach for actors or streams "just in case."
-
----
-
-## VB.NET vs C# — Concurrency Cheat Sheet
-
-| C# | VB.NET |
-|---|---|
-| `async Task DoAsync()` | `Async Function DoAsync() As Task` |
-| `async Task<T> GetAsync()` | `Async Function GetAsync() As Task(Of T)` |
-| `async void OnClick(...)` (event handler only) | `Async Sub OnClick(...)` (event handler only) |
-| `await foo` | `Await foo` |
-| `await Task.WhenAll(a, b)` | `Await Task.WhenAll(a, b)` |
-| `CancellationToken ct` | `ct As CancellationToken` |
-| `new CancellationTokenSource()` | `New CancellationTokenSource()` |
-| `lock (_sync) { ... }` | `SyncLock _sync ... End SyncLock` |
-| `Task.Run(() => ...)` | `Task.Run(Function() ...)` or `Task.Run(Sub() ... End Sub)` |
-| `await foreach (var x in reader.ReadAllAsync(ct))` | **No `Await For Each`.** Use `WaitToReadAsync` + `TryRead` loop, or `GetAsyncEnumerator` + `MoveNextAsync`. |
-| `yield return` in an async iterator | **C#-only.** Consume `IAsyncEnumerable(Of T)` in VB, don't author it. |
-| `await using var x = ...` | **No `Await Using`.** Use `Using ... End Using` for sync `IDisposable`; for `IAsyncDisposable` wrap in `Try/Finally` and `Await x.DisposeAsync()`. |
-| `ConfigureAwait(false)` | `.ConfigureAwait(False)` — same semantics |
-| `ValueTask` / `ValueTask<T>` | `ValueTask` / `ValueTask(Of T)` — same semantics |
+**具体的な要件がある場合にのみ上位に移行する。** 「念のため」アクターやストリームに手を伸ばさない。

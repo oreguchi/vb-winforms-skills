@@ -1,30 +1,31 @@
 ---
 name: vb-winforms
-description: "Use when building, maintaining, or modernizing VB.NET Windows Forms apps on .NET or .NET Framework, covering designer-driven UI, MVP separation, data binding, async UI, validation, and .NET Framework-to-modern migration."
+description: "VB.NET で Windows Forms アプリケーションを構築、保守、またはモダナイズする。デザイナー駆動 UI、イベント処理、データバインディング、MVP 分離、モダン .NET への移行を実践的に扱う。WinForms プロジェクトの開発または .NET Framework からの移行時に使用する。"
+compatibility: ".NET または .NET Framework 上の Windows Forms プロジェクトが必要。"
 ---
 
-# VB.NET Windows Forms
+# Windows Forms
 
 ## Trigger On
 
-- working on VB.NET Windows Forms UI, event-driven workflows, or classic LOB applications
-- migrating VB.NET WinForms from .NET Framework to modern .NET
-- cleaning up oversized form code or designer coupling
-- implementing data binding, validation, or control customization
+- Windows Forms UI、イベント駆動ワークフロー、またはクラシック LOB アプリケーションの開発
+- WinForms を .NET Framework からモダン .NET へ移行する
+- 肥大化したフォームコードやデザイナー結合の整理
+- データバインディング、入力検証、またはコントロールカスタマイズの実装
 
 ## Workflow
 
-1. **Respect designer boundaries** — never edit `.Designer.vb` directly; changes are lost on regeneration.
-2. **Separate business logic from forms** — use MVP (Model-View-Presenter) pattern. Forms orchestrate UI; presenters contain logic; services handle data access.
-   ```vb
-   ' View interface — forms implement this
+1. **デザイナー境界を尊重する** — `.Designer.vb` を直接編集しない。再生成時に変更が失われる。
+2. **ビジネスロジックをフォームから分離する** — MVP（Model-View-Presenter）パターンを使用する。フォームは UI を統括し、プレゼンターがロジックを保持し、サービスがデータアクセスを担う。
+   ```vbnet
+   ' View インターフェース — フォームがこれを実装する
    Public Interface ICustomerView
        Property CustomerName As String
        Event SaveRequested As EventHandler
        Sub ShowError(message As String)
    End Interface
 
-   ' Presenter — testable without UI
+   ' Presenter — UI なしでテスト可能
    Public Class CustomerPresenter
        Private ReadOnly _view As ICustomerView
        Private ReadOnly _service As ICustomerService
@@ -32,41 +33,29 @@ description: "Use when building, maintaining, or modernizing VB.NET Windows Form
        Public Sub New(view As ICustomerView, service As ICustomerService)
            _view = view
            _service = service
-           AddHandler _view.SaveRequested, AddressOf OnSaveRequested
-       End Sub
-
-       Private Async Sub OnSaveRequested(sender As Object, e As EventArgs)
-           Try
-               Await _service.SaveAsync(_view.CustomerName)
-           Catch ex As Exception
-               _view.ShowError(ex.Message)
-           End Try
+           AddHandler _view.SaveRequested, Async Sub(s, e)
+               Try
+                   Await _service.SaveAsync(_view.CustomerName)
+               Catch ex As Exception
+                   _view.ShowError(ex.Message)
+               End Try
+           End Sub
        End Sub
    End Class
    ```
-3. **Use DI from Program.vb** (.NET 6+):
-   ```vb
-   Imports Microsoft.Extensions.DependencyInjection
-
-   Module Program
-       <STAThread>
-       Sub Main()
-           ApplicationConfiguration.Initialize()
-
-           Dim services As New ServiceCollection()
-           services.AddSingleton(Of ICustomerService, CustomerService)()
-           services.AddTransient(Of MainForm)()
-
-           Using sp = services.BuildServiceProvider()
-               Application.Run(sp.GetRequiredService(Of MainForm)())
-           End Using
-       End Sub
-   End Module
+3. **Program.vb から DI を使用する**（.NET 6+）:
+   ```vbnet
+   Dim services = New ServiceCollection()
+   services.AddSingleton(Of ICustomerService, CustomerService)()
+   services.AddTransient(Of MainForm)()
+   Using sp = services.BuildServiceProvider()
+       Application.Run(sp.GetRequiredService(Of MainForm)())
+   End Using
    ```
-4. **Use data binding** via `BindingSource` and `INotifyPropertyChanged` instead of manual control population. See references/patterns.md for complete binding patterns.
-5. **Use async/await** for I/O operations — disable controls during loading, use `Progress(Of T)` for progress reporting. Never block the UI thread.
-6. **Validate with `ErrorProvider`** and the `Validating` event. Call `ValidateChildren()` before save operations.
-7. **Modernize incrementally** — prefer better structure over big-bang rewrites. Use modern .NET features where available (stock icons in .NET 7+, button commands in .NET 9+).
+4. **`BindingSource` と `INotifyPropertyChanged` を使ったデータバインディング**を利用し、手動によるコントロール設定を避ける。完全なバインディングパターンは references/patterns.md を参照。
+5. **I/O 操作には async/await を使用する** — 読み込み中はコントロールを無効化し、進捗報告には `Progress(Of T)` を使用する。UI スレッドをブロックしない。
+6. **`ErrorProvider` と `Validating` イベントで入力検証を行う**。保存操作の前に `ValidateChildren()` を呼び出す。
+7. **段階的にモダナイズする** — ビッグバン的な書き換えより、良い構造への漸進的改善を優先する。利用可能であれば .NET 8+ の機能（ボタンコマンド、ストックアイコン）を活用する。
 
 ```mermaid
 flowchart LR
@@ -78,30 +67,30 @@ flowchart LR
 
 ## Key Decisions
 
-| Decision | Guidance |
+| 決定事項 | ガイダンス |
 |----------|----------|
-| MVP vs MVVM | Prefer MVP for WinForms — simpler with event-driven model |
-| BindingSource vs manual | Always prefer BindingSource for list/detail binding |
-| Sync vs async I/O | Always async — use `Async Sub` only for event handlers |
-| Custom controls | Extract reusable `UserControl` when form grows beyond ~300 lines |
-| .NET Framework → .NET | Use the official migration guide; validate designer compatibility first |
+| MVP vs MVVM | WinForms では MVP を推奨 — イベント駆動モデルとの親和性が高い |
+| BindingSource vs 手動 | リスト/詳細バインディングでは常に BindingSource を優先する |
+| 同期 vs 非同期 I/O | 常に非同期 — `Async Sub` はイベントハンドラにのみ使用する |
+| カスタムコントロール | フォームが約 300 行を超えたら再利用可能な `UserControl` に抽出する |
+| .NET Framework → .NET | 公式移行ガイドを使用し、まずデザイナーの互換性を検証する |
 
 ## Deliver
 
-- less brittle form code with clear UI/logic separation
-- MVP pattern with testable presenters
-- pragmatic modernization guidance for VB.NET WinForms-heavy apps
-- data binding and validation patterns that reduce manual wiring
+- 明確な UI/ロジック分離による堅牢なフォームコード
+- テスト可能なプレゼンターを持つ MVP パターン
+- WinForms 重視のアプリに対する実践的なモダナイズガイダンス
+- 手動配線を削減するデータバインディングと入力検証のパターン
 
 ## Validate
 
-- designer files stay stable and are not hand-edited
-- forms are not acting as the application service layer
-- async operations do not block the UI thread
-- validation is implemented consistently with ErrorProvider
-- Windows-only runtime behavior is tested on target
+- デザイナーファイルが安定しており、手動編集されていない
+- フォームがアプリケーションサービス層として機能していない
+- 非同期処理が UI スレッドをブロックしていない
+- 入力検証が ErrorProvider で一貫して実装されている
+- Windows 専用のランタイム動作がターゲット環境でテストされている
 
 ## References
 
-- references/patterns.md - VB.NET WinForms architectural patterns (MVP, MVVM, Passive View), data binding, validation, form communication, threading, DI setup, and .NET 8+ features
-- references/migration.md - step-by-step migration from .NET Framework to modern .NET, common issues, deployment options, and gradual migration strategies
+- references/patterns.md - WinForms アーキテクチャパターン（MVP、MVVM、Passive View）、データバインディング、入力検証、フォーム間通信、スレッド処理、DI セットアップ、および .NET 8+ の機能
+- references/migration.md - .NET Framework からモダン .NET へのステップバイステップの移行手順、よくある問題、デプロイオプション、段階的移行戦略

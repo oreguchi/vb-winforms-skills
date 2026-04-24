@@ -1,61 +1,61 @@
-# VB.NET WinForms Migration to Modern .NET
+# WinForms のモダン .NET への移行
 
-## Migration Overview
+## 移行の概要
 
-Migrating VB.NET Windows Forms applications from .NET Framework to modern .NET (6, 7, 8, 9, 10) provides:
-- Better performance and memory efficiency
-- Access to modern VB.NET language features
-- Side-by-side deployment without system-wide runtime
-- Continued support and security updates
-- Access to new WinForms features
+Windows Forms アプリケーションを .NET Framework からモダン .NET（6、7、8、9、10）へ移行することで、以下のメリットが得られる。
+- パフォーマンスとメモリ効率の向上
+- モダン VB.NET 言語機能へのアクセス
+- システム全体へのランタイムインストール不要なサイドバイサイドデプロイ
+- 継続的なサポートとセキュリティ更新
+- 新しい WinForms 機能へのアクセス
 
-## Prerequisites Assessment
+## 事前調査
 
-### Compatibility Analysis
+### 互換性分析
 
-Before migrating, analyze your application for compatibility:
+移行前に、アプリケーションの互換性を分析する。
 
 ```bash
-# Install the .NET Upgrade Assistant
+# .NET Upgrade Assistant をインストールする
 dotnet tool install -g upgrade-assistant
 
-# Analyze project
+# プロジェクトを分析する
 upgrade-assistant analyze MyWinFormsApp.vbproj
 
-# Or run interactive upgrade
+# または対話的なアップグレードを実行する
 upgrade-assistant upgrade MyWinFormsApp.vbproj
 ```
 
-### Common Blockers
+### よくあるブロッカー
 
-| Blocker | Impact | Mitigation |
+| ブロッカー | 影響 | 対処法 |
 |---------|--------|------------|
-| WCF Client | Requires change | Use CoreWCF or gRPC |
-| WCF Server | Not supported | Migrate to ASP.NET Core + gRPC |
-| AppDomain | Limited support | Redesign with AssemblyLoadContext |
-| Remoting | Not supported | Use gRPC or REST APIs |
-| Code Access Security | Not supported | Remove or redesign |
-| Windows Workflow Foundation | Not supported | Use Elsa or other workflow engine |
-| Crystal Reports | May not work | Test or use alternative |
+| WCF クライアント | 変更が必要 | CoreWCF または gRPC を使用する |
+| WCF サーバー | 非サポート | ASP.NET Core + gRPC に移行する |
+| AppDomain | サポート限定 | AssemblyLoadContext で再設計する |
+| Remoting | 非サポート | gRPC または REST API を使用する |
+| Code Access Security | 非サポート | 削除または再設計する |
+| Windows Workflow Foundation | 非サポート | Elsa 等のワークフローエンジンを使用する |
+| Crystal Reports | 動作しない可能性あり | テストするか代替手段を使用する |
 
-### Check for Deprecated APIs
+### 非推奨 API の確認
 
-```vb
-' These patterns indicate potential issues:
+```vbnet
+' 以下のパターンは潜在的な問題を示す:
 
-' App.config usage — may need migration
+' App.config の使用 — 移行が必要な場合がある
 ConfigurationManager.AppSettings("MySetting")
 
-' System.Web references — not available in modern .NET
+' System.Web の参照 — 利用不可
 System.Web.HttpUtility.UrlEncode(value)
 
-' Drawing.Common differences on non-Windows
+' Drawing.Common の差異（非 Windows 環境）
 System.Drawing.Image.FromFile(path)
 ```
 
-## Project File Migration
+## プロジェクトファイルの移行
 
-### Before (.NET Framework)
+### 移行前（.NET Framework）
 
 ```xml
 <?xml version="1.0" encoding="utf-8"?>
@@ -76,7 +76,7 @@ System.Drawing.Image.FromFile(path)
     <Reference Include="System.Data" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
-    <!-- Many more references -->
+    <!-- 他にも多数の参照 -->
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Form1.vb">
@@ -85,13 +85,13 @@ System.Drawing.Image.FromFile(path)
     <Compile Include="Form1.Designer.vb">
       <DependentUpon>Form1.vb</DependentUpon>
     </Compile>
-    <!-- Many more compile items -->
+    <!-- 他にも多数のコンパイル対象 -->
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
 </Project>
 ```
 
-### After (Modern .NET SDK-Style)
+### 移行後（モダン .NET SDK 形式）
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -99,20 +99,10 @@ System.Drawing.Image.FromFile(path)
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Note: <ImplicitUsings> is C#-only and has no VB.NET equivalent.
-         For project-level namespace imports in VB.NET, use <Import Include="Namespace.Name"/>
-         inside an <ItemGroup> (shown below). This is not the same feature as C# implicit usings,
-         but serves the analogous role of avoiding per-file Imports statements. -->
   </PropertyGroup>
-
-  <ItemGroup>
-    <!-- Project-level imports (VB.NET equivalent of per-project namespace defaults) -->
-    <Import Include="System" />
-    <Import Include="System.Collections.Generic" />
-    <Import Include="System.Linq" />
-    <Import Include="System.Windows.Forms" />
-  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
@@ -121,32 +111,30 @@ System.Drawing.Image.FromFile(path)
 </Project>
 ```
 
-**Note:** The `<Nullable>enable</Nullable>` property from the C# SDK-style template is a C#-specific nullable reference types (NRT) feature. VB.NET has its own nullable value type support (`Integer?`, `Nullable(Of T)`) but does not use the NRT compiler annotation system. Omit `<Nullable>enable</Nullable>` from VB.NET project files.
+## ステップバイステップの移行手順
 
-## Step-by-Step Migration
-
-### Step 1: Create New Project
+### ステップ 1: 新規プロジェクトの作成
 
 ```bash
-# Create new VB.NET WinForms project
-dotnet new winforms -lang VB -n MyWinFormsApp.Modern -f net9.0
+# 新しい WinForms プロジェクトを作成する
+dotnet new winforms -n MyWinFormsApp.Modern -f net9.0 --language VB
 
-# Or use specific template features
-dotnet new winforms -lang VB -n MyWinFormsApp.Modern --no-restore
+# または特定のテンプレートオプションを指定する
+dotnet new winforms -n MyWinFormsApp.Modern --no-restore --language VB
 ```
 
-### Step 2: Copy Source Files
+### ステップ 2: ソースファイルのコピー
 
-Copy these files from the old project:
-- All `.vb` files (forms, classes, controls)
-- All `.resx` files (resources)
-- All `.Designer.vb` files
-- Assets (images, icons, etc.)
+旧プロジェクトから以下のファイルをコピーする。
+- すべての `.vb` ファイル（フォーム、クラス、コントロール）
+- すべての `.resx` ファイル（リソース）
+- すべての `.Designer.vb` ファイル
+- アセット（画像、アイコンなど）
 
-### Step 3: Update Program.vb
+### ステップ 3: Program.vb の更新
 
-```vb
-' .NET Framework style
+```vbnet
+' .NET Framework スタイル
 Module Program
     <STAThread>
     Sub Main()
@@ -156,7 +144,7 @@ Module Program
     End Sub
 End Module
 
-' Modern .NET style
+' モダン .NET スタイル
 Module Program
     <STAThread>
     Sub Main()
@@ -165,10 +153,7 @@ Module Program
     End Sub
 End Module
 
-' Modern .NET with DI
-Imports Microsoft.Extensions.DependencyInjection
-Imports Microsoft.Extensions.Hosting
-
+' DI 使用のモダン .NET スタイル
 Module Program
     <STAThread>
     Sub Main()
@@ -176,9 +161,9 @@ Module Program
 
         Dim host = Host.CreateDefaultBuilder() _
             .ConfigureServices(Sub(context, services)
-                                   services.AddTransient(Of MainForm)()
-                                   services.AddTransient(Of ICustomerService, CustomerService)()
-                               End Sub) _
+                services.AddSingleton(Of MainForm)()
+                services.AddTransient(Of ICustomerService, CustomerService)()
+            End Sub) _
             .Build()
 
         Dim mainForm = host.Services.GetRequiredService(Of MainForm)()
@@ -187,9 +172,9 @@ Module Program
 End Module
 ```
 
-### Step 4: Update Configuration
+### ステップ 4: 構成の更新
 
-Replace `app.config` with `appsettings.json`:
+`app.config` を `appsettings.json` に置き換える。
 
 ```json
 {
@@ -203,8 +188,8 @@ Replace `app.config` with `appsettings.json`:
 }
 ```
 
-```vb
-' Reading configuration
+```vbnet
+' 構成の読み込み
 Public Class AppConfig
     Private ReadOnly _configuration As IConfiguration
 
@@ -230,50 +215,50 @@ Public Class AppConfig
 End Class
 ```
 
-### Step 5: Update NuGet References
+### ステップ 5: NuGet 参照の更新
 
-Replace packages.config with PackageReference:
+packages.config を PackageReference に置き換える。
 
 ```xml
-<!-- Old packages.config style -->
+<!-- 旧 packages.config 形式 -->
 <packages>
   <package id="Newtonsoft.Json" version="13.0.1" targetFramework="net48" />
   <package id="Dapper" version="2.0.123" targetFramework="net48" />
 </packages>
 
-<!-- New PackageReference style in .vbproj -->
+<!-- 新 PackageReference 形式（.vbproj 内） -->
 <ItemGroup>
   <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   <PackageReference Include="Dapper" Version="2.1.35" />
 </ItemGroup>
 ```
 
-### Step 6: Handle API Differences
+### ステップ 6: API 差異への対応
 
-```vb
-' BinaryFormatter — no longer recommended, use alternatives
-' Old
-Dim formatter As New BinaryFormatter()
+```vbnet
+' BinaryFormatter — 推奨されなくなったため代替手段を使用する
+' 旧
+Dim formatter = New BinaryFormatter()
 formatter.Serialize(stream, obj)
 
-' New — use System.Text.Json or other serializers
+' 新 — System.Text.Json 等のシリアライザーを使用する
 Dim json = JsonSerializer.Serialize(obj)
 Await File.WriteAllTextAsync(path, json)
 
-' System.Drawing differences
-' Old — worked everywhere
-Using bitmap As New Bitmap(path)
+' System.Drawing の差異
+' 旧 — すべての環境で動作した
+Using bitmap = New Bitmap(path)
     ' ...
 End Using
 
-' New — Windows-only by default, use SkiaSharp for cross-platform
-' Or add package reference:
+' 新 — デフォルトでは Windows のみ。クロスプラットフォームは SkiaSharp を使用する
+' または以下のパッケージを追加する:
 ' <PackageReference Include="System.Drawing.Common" Version="8.0.0" />
 ```
 
-### Step 7: Update Assembly Info
+### ステップ 7: アセンブリ情報の更新
 
-Remove `AssemblyInfo.vb` and use project properties:
+`AssemblyInfo.vb` を削除し、プロジェクトプロパティを使用する。
 
 ```xml
 <PropertyGroup>
@@ -286,23 +271,23 @@ Remove `AssemblyInfo.vb` and use project properties:
 </PropertyGroup>
 ```
 
-## Common Migration Issues
+## よくある移行問題
 
-### Designer Issues
+### デザイナーの問題
 
-```vb
-' Issue: Designer fails to load after migration
-' Solution: Ensure all dependencies are available and rebuild
+```vbnet
+' 問題: 移行後にデザイナーが読み込まれない
+' 対処法: すべての依存関係が利用可能であることを確認し、再ビルドする
 
-' Issue: User controls not showing in toolbox
-' Solution: Build solution, then refresh toolbox
+' 問題: ユーザーコントロールがツールボックスに表示されない
+' 対処法: ソリューションをビルドし、ツールボックスを更新する
 
-' Issue: Resources not loading
-' Solution: Ensure .resx files have correct build action
+' 問題: リソースが読み込まれない
+' 対処法: .resx ファイルのビルドアクションが正しいことを確認する
 ```
 
 ```xml
-<!-- Ensure resources are embedded -->
+<!-- リソースが埋め込まれていることを確認する -->
 <ItemGroup>
   <EmbeddedResource Update="Form1.resx">
     <DependentUpon>Form1.vb</DependentUpon>
@@ -310,52 +295,49 @@ Remove `AssemblyInfo.vb` and use project properties:
 </ItemGroup>
 ```
 
-### Third-Party Controls
+### サードパーティコントロール
 
-```vb
-' Check compatibility before migration
-' Many vendors provide .NET 6+ compatible versions
+```vbnet
+' 移行前に互換性を確認する
+' 多くのベンダーが .NET 6+ 対応版を提供している
 
-' DevExpress, Telerik, Infragistics, etc. — check vendor documentation
-' Older/abandoned controls — may need replacement
+' DevExpress、Telerik、Infragistics 等 — ベンダードキュメントを確認する
+' 古い/放棄されたコントロール — 置き換えが必要な場合がある
 
-' If control source is available, consider migrating it too
-' Or replace with:
-' - Built-in .NET controls
-' - Open-source alternatives (be mindful of licensing)
-' - Custom implementations
+' コントロールのソースコードが入手可能な場合は一緒に移行することを検討する
+' または以下に置き換える:
+' - 組み込み .NET コントロール
+' - オープンソース代替品（ライセンスに注意）
+' - カスタム実装
 ```
 
-### Database Access
+### データベースアクセス
 
-```vb
-' Entity Framework 6 to EF Core
-' Old (EF6)
-Using context As New MyDbContext()
+```vbnet
+' Entity Framework 6 から EF Core へ
+' 旧（EF6）
+Using context = New MyDbContext()
     Dim customers = context.Customers.Where(Function(c) c.IsActive).ToList()
 End Using
 
-' New (EF Core) — VB does not support Await Using; dispose via Try/Finally
-Dim context As New MyDbContext()
-Try
+' 新（EF Core）
+Await Using context = New MyDbContext()
     Dim customers = Await context.Customers _
         .Where(Function(c) c.IsActive) _
         .ToListAsync()
-Finally
-    Await context.DisposeAsync()
-End Try
+End Using
 ```
 
-### WCF Client Migration
+### WCF クライアントの移行
 
-```vb
-' Option 1: Use System.ServiceModel packages
+```vbnet
+' オプション 1: System.ServiceModel パッケージを使用する
 ' <PackageReference Include="System.ServiceModel.Http" Version="6.0.0" />
 
-' Option 2: Generate new client
+' オプション 2: 新しいクライアントを生成する
 ' dotnet-svcutil https://service.example.com/MyService?wsdl
 
-' Option 3: Replace with HTTP client for REST services
+' オプション 3: REST サービス向けに HTTP クライアントに置き換える
 Public Class MyServiceClient
     Private ReadOnly _client As HttpClient
 
@@ -367,15 +349,13 @@ Public Class MyServiceClient
 End Class
 ```
 
-## High-DPI and Modern Features
+## 高 DPI とモダン機能
 
-### Enable High-DPI Support
+### 高 DPI サポートの有効化
 
-```vb
-' In Program.vb — ApplicationConfiguration.Initialize() already applies high-DPI settings.
-' Prefer configuring DPI via <ApplicationHighDpiMode> in the .vbproj instead of
-' calling Application.SetHighDpiMode explicitly.
-ApplicationConfiguration.Initialize()
+```vbnet
+' Program.vb 内（ApplicationConfiguration.Initialize() に既に含まれている）
+Application.SetHighDpiMode(HighDpiMode.PerMonitorV2)
 ```
 
 ```xml
@@ -388,85 +368,84 @@ ApplicationConfiguration.Initialize()
 </application>
 ```
 
-### Use New .NET Features
+### .NET 8/9 の新機能の活用
 
-```vb
-' Button commands (.NET 9+)
+```vbnet
+' ボタンコマンド（.NET 8+）
 btnSave.Command = New RelayCommand(AddressOf Save, AddressOf CanSave)
 
-' System icons (.NET 7+)
+' システムアイコン（.NET 8+）
 Dim icon = SystemIcons.GetStockIcon(StockIconId.Info)
 
-' Improved data binding (.NET 9+)
-' Better performance and memory usage
+' 改善されたデータバインディング（.NET 9+）
+' パフォーマンスとメモリ使用量の改善
 
-' FolderBrowserDialog improvements (.NET 5+)
-Using dialog As New FolderBrowserDialog With {
+' FolderBrowserDialog の改善
+Using dialog = New FolderBrowserDialog With {
     .InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
     .ShowNewFolderButton = True,
     .UseDescriptionForTitle = True,
     .Description = "Select output folder"
 }
-    ' ...
 End Using
 ```
 
-## Testing After Migration
+## 移行後のテスト
 
-### Functional Testing Checklist
+### 機能テストチェックリスト
 
-- [ ] Application launches without errors
-- [ ] All forms open correctly
-- [ ] Designer loads all forms
-- [ ] Data binding works correctly
-- [ ] Validation behaves as expected
-- [ ] Database operations work
-- [ ] File operations work
-- [ ] Printing works (if applicable)
-- [ ] Third-party controls function
-- [ ] Resources (images, icons) load
-- [ ] Localization works (if applicable)
-- [ ] High-DPI displays correctly
-- [ ] Keyboard shortcuts work
-- [ ] Tab order is correct
+- [ ] アプリケーションがエラーなく起動する
+- [ ] すべてのフォームが正しく開く
+- [ ] デザイナーがすべてのフォームを読み込む
+- [ ] データバインディングが正しく動作する
+- [ ] 入力検証が期待通りに動作する
+- [ ] データベース操作が動作する
+- [ ] ファイル操作が動作する
+- [ ] 印刷が動作する（該当する場合）
+- [ ] サードパーティコントロールが機能する
+- [ ] リソース（画像、アイコン）が読み込まれる
+- [ ] ローカライズが動作する（該当する場合）
+- [ ] 高 DPI が正しく表示される
+- [ ] キーボードショートカットが動作する
+- [ ] タブオーダーが正しい
 
-### Performance Testing
+### パフォーマンステスト
 
-```vb
-' Basic startup timing
+```vbnet
+' 基本的な起動時間計測
 Dim sw = Stopwatch.StartNew()
 Application.Run(New MainForm())
 Console.WriteLine($"Startup: {sw.ElapsedMilliseconds}ms")
 
-' Memory usage comparison
-' Use dotnet-counters or Visual Studio diagnostics
+' メモリ使用量の比較
+' dotnet-counters または Visual Studio 診断ツールを使用する
 ' dotnet-counters monitor --process-id <PID>
 ```
 
-## Deployment
+## デプロイ
 
-### Framework-Dependent Deployment
+### フレームワーク依存デプロイ
 
 ```bash
-# Requires .NET runtime on target machine
+# ターゲットマシンに .NET ランタイムが必要
 dotnet publish -c Release -r win-x64 --self-contained false
 ```
 
-### Self-Contained Deployment
+### 自己完結型デプロイ
 
 ```bash
-# Includes runtime, larger but no dependencies
+# ランタイムを含む。サイズは大きいが依存関係なし
 dotnet publish -c Release -r win-x64 --self-contained true
 
-# Single file (recommended for distribution)
+# 単一ファイル（配布に推奨）
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 
-# Trimmed (smaller size, test thoroughly)
+# トリム済み（サイズ削減、十分なテストが必要）
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=true
 ```
 
 ```xml
-<!-- Project settings for publishing -->
+<!-- 発行のプロジェクト設定 -->
 <PropertyGroup>
   <RuntimeIdentifier>win-x64</RuntimeIdentifier>
   <SelfContained>true</SelfContained>
@@ -476,53 +455,53 @@ dotnet publish -c Release -r win-x64 --self-contained true -p:PublishTrimmed=tru
 </PropertyGroup>
 ```
 
-## Gradual Migration Strategy
+## 段階的移行戦略
 
-For large applications, consider incremental migration:
+大規模なアプリケーションでは、段階的な移行を検討する。
 
-### 1. Shared Library Approach
+### 1. 共有ライブラリアプローチ
 
 ```text
 Solution/
-├── MyApp.Core/                 # .NET Standard 2.0 — shared
+├── MyApp.Core/                 # .NET Standard 2.0 - 共有
 │   ├── Models/
 │   ├── Services/
 │   └── Interfaces/
-├── MyApp.WinForms.Legacy/      # .NET Framework 4.8 — old UI
+├── MyApp.WinForms.Legacy/      # .NET Framework 4.8 - 旧 UI
 │   └── References MyApp.Core
-├── MyApp.WinForms.Modern/      # .NET 9 — new UI
+├── MyApp.WinForms.Modern/      # .NET 9 - 新 UI
 │   └── References MyApp.Core
 ```
 
-### 2. Feature-by-Feature Migration
+### 2. 機能ごとの移行
 
-1. Migrate shared business logic to .NET Standard
-2. Create new modern .NET VB.NET WinForms project
-3. Migrate forms one at a time
-4. Test each migrated form thoroughly
-5. Retire old project when complete
+1. 共有ビジネスロジックを .NET Standard に移行する
+2. 新しいモダン .NET WinForms プロジェクトを作成する
+3. フォームを一つずつ移行する
+4. 移行した各フォームを十分にテストする
+5. 完了したら旧プロジェクトを廃止する
 
-### 3. Side-by-Side Development
+### 3. サイドバイサイド開発
 
 ```xml
-<!-- Multi-targeting for shared code -->
+<!-- 共有コードのマルチターゲット -->
 <PropertyGroup>
   <TargetFrameworks>net48;net9.0-windows</TargetFrameworks>
 </PropertyGroup>
 ```
 
-```vb
-' Conditional compilation when needed
+```vbnet
+' 必要に応じた条件付きコンパイル
 #If NET48 Then
-    ' .NET Framework specific code
+    ' .NET Framework 固有のコード
 #Else
-    ' Modern .NET code
+    ' モダン .NET のコード
 #End If
 ```
 
-## Resources
+## 参考資料
 
-- [Official Migration Guide](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/migration/)
-- [.NET Upgrade Assistant](https://learn.microsoft.com/en-us/dotnet/core/porting/upgrade-assistant-overview)
-- [Breaking Changes](https://learn.microsoft.com/en-us/dotnet/core/compatibility/winforms)
-- [What's New in Windows Forms](https://learn.microsoft.com/en-us/dotnet/desktop/winforms/whats-new/)
+- [公式移行ガイド](https://learn.microsoft.com/ja-jp/dotnet/desktop/winforms/migration/)
+- [.NET Upgrade Assistant](https://learn.microsoft.com/ja-jp/dotnet/core/porting/upgrade-assistant-overview)
+- [破壊的変更](https://learn.microsoft.com/ja-jp/dotnet/core/compatibility/winforms)
+- [Windows Forms の新機能](https://learn.microsoft.com/ja-jp/dotnet/desktop/winforms/whats-new/)

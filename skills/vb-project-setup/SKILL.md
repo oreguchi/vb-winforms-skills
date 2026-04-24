@@ -1,39 +1,39 @@
 ---
 name: vb-project-setup
-description: "Create or reorganize VB.NET solutions with clean project boundaries, repeatable SDK settings, and a maintainable baseline for libraries, apps, tests, CI, and local development."
-compatibility: "Best for new VB.NET repositories or structural refactors of existing VB.NET solutions."
+description: "クリーンなプロジェクト境界、再現性のある SDK 設定、ライブラリ・アプリ・テスト・CI・ローカル開発向けの保守しやすいベースラインを持つ VB.NET ソリューションを新規作成または再編成する。"
+compatibility: "新規リポジトリ、または既存 VB.NET ソリューションの構造的リファクタリングに最適。"
 ---
 
-# VB.NET Project Setup
+# VB.NET プロジェクトセットアップ
 
-## Trigger On
+## 次の場面で起動
 
-- creating a new VB.NET solution or restructuring an existing one
-- setting up `Directory.Build.props`, shared package management, or repo-wide defaults
-- defining project layout for VB.NET apps, libraries, and test projects
+- 新規 VB.NET ソリューションを作成する、または既存ソリューションを再編成する
+- `Directory.Build.props`、共有パッケージ管理、またはリポジトリ全体のデフォルト設定を構成する
+- アプリ・ライブラリ・テストプロジェクトのプロジェクトレイアウトを定義する
 
-## Workflow
+## ワークフロー
 
-1. Start from the app model and deployment target, then choose the smallest correct SDK and target framework set.
-2. Use solution folders and project names that reflect bounded contexts or product areas, not temporary implementation details.
-3. Centralize shared build settings, analyzer rules, and package versions where it reduces duplication without hiding important differences. Note: VB.NET does not use `<Nullable>enable</Nullable>` (that is a C# nullable reference types feature); VB.NET has its own nullability model via `Nothing` and `Nullable(Of T)`.
-4. Create test projects and CI hooks early so new projects do not drift into unverified templates.
-5. Prefer project references and composition over circular dependencies or utility dumping grounds.
-6. Document the local build, test, and run path in repo docs or `AGENTS.md` when the workflow is not obvious.
+1. アプリモデルとデプロイターゲットを起点に、最小限の正しい SDK とターゲットフレームワークセットを選択する。
+2. ソリューションフォルダとプロジェクト名は、一時的な実装の詳細ではなく、境界コンテキストや製品領域を反映する名前にする。
+3. 重複を減らすために、共有ビルド設定・アナライザールール・Nullable コンテキスト・パッケージバージョンを集中管理する。ただし重要な差異を隠さないよう注意する。
+4. テストプロジェクトと CI フックを早期に作成し、新プロジェクトが未検証のテンプレートに留まらないようにする。
+5. 循環依存やユーティリティの「なんでも入れ場」ではなく、プロジェクト参照とコンポジションを優先する。
+6. ワークフローが自明でない場合は、ローカルのビルド・テスト・実行手順をリポジトリドキュメントまたは `AGENTS.md` に記載する。
 
-## Deliver
+## 成果物
 
-- a coherent VB.NET solution structure
-- shared build defaults that are easy to reason about
-- starter quality and testing hooks for future work
+- 一貫したソリューション構造
+- 理解しやすい共有ビルドデフォルト設定
+- 将来の作業のための品質・テストの足がかり
 
-## Validate
+## 検証
 
-- projects have explicit responsibility boundaries
-- shared MSBuild settings do not accidentally override platform-specific needs
-- a new contributor can build and test the repo without guessing
+- プロジェクトに明確な責務境界がある
+- 共有 MSBuild 設定がプラットフォーム固有のニーズを意図せず上書きしていない
+- 新たな貢献者が推測なしにリポジトリをビルドおよびテストできる
 
-## References
+## 参考資料
 
-- [patterns.md](references/patterns.md): solution layout conventions, `Directory.Build.props` / `Directory.Build.targets`, VB project-level `Option*` properties (`OptionStrict` / `OptionExplicit` / `OptionInfer` / `OptionCompare`), Central Package Management, `global.json` with `rollForward` semantics, `nuget.config`, analyzers and `.editorconfig`, multi-targeting, source link, and solution formats (`.sln` / `.slnx` / `.slnf`)
-- [templates.md](references/templates.md): `dotnet new` support matrix for VB.NET (console, class library, Windows Forms, WPF, xUnit / NUnit / MSTest), constraints on `worker` and `webapi` (no `-lang VB`; use `classlib` or `console` + `BackgroundService`), language-agnostic templates (`sln`, `gitignore`, `editorconfig`, `globaljson`, `tool-manifest`), and a quick-reference command table
+- [patterns.md](references/patterns.md): ソリューションレイアウト規約、`Directory.Build.props`、`Directory.Build.targets`、Central Package Management、`global.json`、`nuget.config`、アナライザー、マルチターゲティング、SourceLink
+- [templates.md](references/templates.md): コンソールアプリ・クラスライブラリ・ASP.NET Core API・ワーカーサービス・Blazor・テストプロジェクト・.NET Aspire・gRPC サービス向けの `dotnet new` テンプレート

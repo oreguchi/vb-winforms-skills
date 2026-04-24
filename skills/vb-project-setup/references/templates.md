@@ -1,38 +1,35 @@
-# Common VB.NET Project Templates
+# プロジェクトテンプレート一覧
 
-## Overview
+## 概要
 
-.NET provides project templates via `dotnet new`. This reference covers templates that support VB.NET and their typical use cases. Most VB.NET project templates accept `-lang VB` (for example, `console`, `classlib`, `winforms`, `wpf`, `xunit`, `nunit`, `mstest`). Language-agnostic templates (`sln`, `gitignore`, `editorconfig`, `globaljson`, `tool-manifest`) do not take a language flag — they produce the same output regardless of project language.
+.NET は `dotnet new` 経由でプロジェクトテンプレートを提供する。このリファレンスでは一般的なテンプレートとその典型的なユースケースを説明する。VB.NET プロジェクトを作成する場合は `-lang VB` オプションを付けることで VB.NET テンプレートが生成される。
 
 ---
 
-## Listing Available Templates
+## 利用可能なテンプレートの一覧表示
 
 ```bash
-# List all installed templates
+# インストール済みテンプレートをすべて表示
 dotnet new list
 
-# Filter for VB.NET-supported templates
-dotnet new list --language VB
+# テンプレートを検索
+dotnet new search webapi
 
-# Search for templates
-dotnet new search classlib
-
-# Install a template pack
-dotnet new install <TemplatePack>
+# テンプレートパックをインストール
+dotnet new install Microsoft.AspNetCore.SpaTemplates
 ```
 
 ---
 
-## Console Applications
+## コンソールアプリケーション
 
-### Basic Console App
+### 基本コンソールアプリ
 
 ```bash
 dotnet new console -lang VB -n MyApp -o src/MyApp
 ```
 
-**Generated structure:**
+**生成される構造:**
 
 ```text
 src/MyApp/
@@ -40,9 +37,10 @@ src/MyApp/
 └── Program.vb
 ```
 
-**Typical `Program.vb`:**
+**典型的な `Program.vb`:**
 
-```vb
+```vbnet
+' DI を使用したコンソールアプリ向けの最小ホスティング
 Imports Microsoft.Extensions.DependencyInjection
 Imports Microsoft.Extensions.Hosting
 
@@ -59,55 +57,200 @@ Module Program
 End Module
 ```
 
-**Note:** VB.NET does not support top-level statements (a C# 9+ feature). Use `Module Program` with `Sub Main()` instead.
-
 ---
 
-## Class Libraries
+## クラスライブラリ
 
-### Standard Library
+### 標準ライブラリ
 
 ```bash
 dotnet new classlib -lang VB -n MyProduct.Core -o src/MyProduct.Core
 ```
 
-### Library with Multi-Targeting
+### マルチターゲティング付きライブラリ
 
-**Modify the generated `.vbproj`:**
+**生成された `.vbproj` を変更する:**
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>net9.0;net8.0;netstandard2.0</TargetFrameworks>
-    <LangVersion>latest</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageId>MyCompany.MyProduct.Core</PackageId>
     <Description>Core library for MyProduct</Description>
+    <RootNamespace>MyProduct.Core</RootNamespace>
   </PropertyGroup>
 </Project>
 ```
 
 ---
 
-## Windows Forms Applications
+## ASP.NET Core Web API
 
-### WinForms App
+### Minimal API
 
 ```bash
-dotnet new winforms -lang VB -n MyProduct.App -o src/MyProduct.App
+dotnet new webapi -lang VB -n MyProduct.Api -o src/MyProduct.Api --use-minimal-apis
 ```
 
-**Generated structure:**
+**典型的な構造:**
 
 ```text
-src/MyProduct.App/
-├── MyProduct.App.vbproj
-├── Form1.vb
-├── Form1.Designer.vb
-└── Program.vb
+src/MyProduct.Api/
+├── MyProduct.Api.vbproj
+├── Program.vb
+├── Properties/
+│   └── launchSettings.json
+├── appsettings.json
+└── appsettings.Development.json
 ```
 
-**Typical `.vbproj`:**
+**Minimal API `Program.vb` の例:**
+
+```vbnet
+Imports Microsoft.AspNetCore.Builder
+Imports Microsoft.AspNetCore.Http
+Imports Microsoft.Extensions.DependencyInjection
+Imports Microsoft.Extensions.Hosting
+
+Module Program
+    Sub Main(args As String())
+        Dim builder = WebApplication.CreateBuilder(args)
+
+        builder.Services.AddEndpointsApiExplorer()
+        builder.Services.AddSwaggerGen()
+
+        Dim app = builder.Build()
+
+        If app.Environment.IsDevelopment() Then
+            app.UseSwagger()
+            app.UseSwaggerUI()
+        End If
+
+        app.UseHttpsRedirection()
+
+        app.MapGet("/api/health", Function() Results.Ok(New With {.Status = "Healthy"})) _
+           .WithName("HealthCheck") _
+           .WithOpenApi()
+
+        app.Run()
+    End Sub
+End Module
+```
+
+### コントローラーベース API
+
+```bash
+dotnet new webapi -lang VB -n MyProduct.Api -o src/MyProduct.Api --use-controllers
+```
+
+**コントローラーテンプレート:**
+
+```vbnet
+Imports Microsoft.AspNetCore.Mvc
+Imports System.Threading
+
+Namespace MyProduct.Api.Controllers
+
+    <ApiController>
+    <Route("api/[controller]")>
+    Public Class ItemsController
+        Inherits ControllerBase
+
+        Private ReadOnly _itemService As IItemService
+
+        Public Sub New(itemService As IItemService)
+            _itemService = itemService
+        End Sub
+
+        <HttpGet>
+        Public Async Function GetAll(ct As CancellationToken) As Task(Of ActionResult(Of IEnumerable(Of ItemDto)))
+            Dim items = Await _itemService.GetAllAsync(ct)
+            Return Ok(items)
+        End Function
+
+        <HttpGet("{id:guid}")>
+        Public Async Function GetById(id As Guid, ct As CancellationToken) As Task(Of ActionResult(Of ItemDto))
+            Dim item = Await _itemService.GetByIdAsync(id, ct)
+            If item Is Nothing Then
+                Return NotFound()
+            Else
+                Return Ok(item)
+            End If
+        End Function
+
+        <HttpPost>
+        Public Async Function Create(request As CreateItemRequest, ct As CancellationToken) As Task(Of ActionResult(Of ItemDto))
+            Dim item = Await _itemService.CreateAsync(request, ct)
+            Return CreatedAtAction(NameOf(GetById), New With {.id = item.Id}, item)
+        End Function
+
+    End Class
+
+End Namespace
+```
+
+---
+
+## ワーカーサービス
+
+### バックグラウンドサービス
+
+```bash
+dotnet new worker -lang VB -n MyProduct.Worker -o src/MyProduct.Worker
+```
+
+**ワーカーテンプレート:**
+
+```vbnet
+Imports Microsoft.Extensions.Hosting
+Imports Microsoft.Extensions.Logging
+Imports Microsoft.Extensions.DependencyInjection
+Imports System.Threading
+Imports System.Threading.Tasks
+
+Namespace MyProduct.Worker
+
+    Public Class Worker
+        Inherits BackgroundService
+
+        Private ReadOnly _logger As ILogger(Of Worker)
+        Private ReadOnly _scopeFactory As IServiceScopeFactory
+
+        Public Sub New(logger As ILogger(Of Worker), scopeFactory As IServiceScopeFactory)
+            _logger = logger
+            _scopeFactory = scopeFactory
+        End Sub
+
+        Protected Overrides Async Function ExecuteAsync(stoppingToken As CancellationToken) As Task
+            While Not stoppingToken.IsCancellationRequested
+                _logger.LogInformation("Worker running at: {Time}", DateTimeOffset.Now)
+
+                Using scope = _scopeFactory.CreateScope()
+                    Dim service = scope.ServiceProvider.GetRequiredService(Of IMyService)()
+                    Await service.ProcessAsync(stoppingToken)
+                End Using
+
+                Await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken)
+            End While
+        End Function
+
+    End Class
+
+End Namespace
+```
+
+---
+
+## Windows Forms アプリケーション
+
+### 基本 WinForms アプリ
+
+```bash
+dotnet new winforms -lang VB -n MyApp.UI -o src/MyApp.UI
+```
+
+**生成される `.vbproj`（重要プロパティ）:**
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
@@ -115,43 +258,60 @@ src/MyProduct.App/
     <OutputType>WinExe</OutputType>
     <TargetFramework>net9.0-windows</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
-    <LangVersion>latest</LangVersion>
-    <RootNamespace>MyProduct.App</RootNamespace>
+    <RootNamespace>MyApp.UI</RootNamespace>
   </PropertyGroup>
 </Project>
 ```
 
+**注意事項:**
+
+- WinForms は Windows 限定のため、`TargetFramework` は `net9.0-windows` 形式（`-windows` サフィックス付き）を使用する。`Directory.Build.props` で `net9.0` を設定している場合は、WinForms プロジェクトのみ個別に上書きする。
+- `<UseWindowsForms>true</UseWindowsForms>` は WinForms デザイナーと Windows Forms ランタイムを有効化するため必須。
+- `<OutputType>WinExe</OutputType>` により、コンソールウィンドウを表示しない GUI 実行可能ファイルを生成する。
+
 ---
 
-## WPF Applications
+## Web アプリケーション
 
-### WPF App
+> **注記**: 本セクションのテンプレートのうち `dotnet new blazor` は VB.NET 公式テンプレートが提供されていない（`-lang VB` を付けても C# プロジェクトが生成される）。本セクションの Blazor サブセクションは C# 実装を参考情報として掲載する。`dotnet new webapp`（Razor Pages）は VB.NET テンプレート対応済み（下記参照）。
+
+### Blazor Server
 
 ```bash
-dotnet new wpf -lang VB -n MyProduct.WpfApp -o src/MyProduct.WpfApp
+dotnet new blazor -n MyProduct.Web -o src/MyProduct.Web --interactivity Server
 ```
 
-**Note:** VB.NET supports WPF project creation via `dotnet new wpf -lang VB`, but XAML-based WPF development is primarily a C# ecosystem. VB.NET WPF projects generate a `.vbproj` with `<UseWPF>true</UseWPF>`. XAML files themselves are language-agnostic. Code-behind files use `.xaml.vb` extensions and standard VB.NET syntax.
+### Blazor WebAssembly
+
+```bash
+dotnet new blazor -n MyProduct.Web -o src/MyProduct.Web --interactivity WebAssembly
+```
+
+### Razor Pages
+
+```bash
+dotnet new webapp -lang VB -n MyProduct.Web -o src/MyProduct.Web
+```
 
 ---
 
-## Test Projects
+## テストプロジェクト
 
-### xUnit Test Project
+### xUnit テストプロジェクト
 
 ```bash
 dotnet new xunit -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
 ```
 
-**Test project `.vbproj`:**
+**テストプロジェクト `.vbproj`:**
 
 ```xml
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <LangVersion>latest</LangVersion>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <RootNamespace>MyProduct.Core.Tests</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
@@ -169,12 +329,13 @@ dotnet new xunit -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
 </Project>
 ```
 
-**Test class template:**
+**テストクラステンプレート:**
 
-```vb
+```vbnet
 Imports FluentAssertions
 Imports Moq
 Imports Xunit
+Imports System.Threading
 
 Namespace MyProduct.Core.Tests
 
@@ -193,7 +354,9 @@ Namespace MyProduct.Core.Tests
             ' Arrange
             Dim itemId = Guid.NewGuid()
             Dim expected = New Item With {.Id = itemId, .Name = "Test"}
-            _repositoryMock.Setup(Function(r) r.GetByIdAsync(itemId, It.IsAny(Of CancellationToken)())).ReturnsAsync(expected)
+            _repositoryMock _
+                .Setup(Function(r) r.GetByIdAsync(itemId, It.IsAny(Of CancellationToken)())) _
+                .ReturnsAsync(expected)
 
             ' Act
             Dim result = Await _sut.GetByIdAsync(itemId, CancellationToken.None)
@@ -211,7 +374,7 @@ Namespace MyProduct.Core.Tests
             Dim request = New CreateItemRequest With {.Name = name}
 
             ' Act
-            Dim act = Async Function() Await _sut.CreateAsync(request, CancellationToken.None)
+            Dim act As Func(Of Task) = Async Function() Await _sut.CreateAsync(request, CancellationToken.None)
 
             ' Assert
             Await act.Should().ThrowAsync(Of ArgumentException)()
@@ -222,58 +385,207 @@ Namespace MyProduct.Core.Tests
 End Namespace
 ```
 
-### NUnit Test Project
+### NUnit テストプロジェクト
 
 ```bash
 dotnet new nunit -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
 ```
 
-### MSTest Test Project
+### MSTest テストプロジェクト
 
 ```bash
 dotnet new mstest -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
 ```
 
----
+### 統合テストプロジェクト
 
-## Solution Setup Commands
+```vbnet
+' WebApplicationFactory ベースの統合テスト
+Imports Microsoft.AspNetCore.Mvc.Testing
+Imports Microsoft.Extensions.DependencyInjection
+Imports Xunit
 
-### Create Solution and VB.NET Projects
+Namespace MyProduct.Api.IntegrationTests
 
-```bash
-# Create solution
-dotnet new sln -n MyProduct
+    Public Class ItemsEndpointTests
+        Implements IClassFixture(Of WebApplicationFactory(Of Program))
 
-# Create projects
-dotnet new classlib -lang VB -n MyProduct.Core -o src/MyProduct.Core
-dotnet new classlib -lang VB -n MyProduct.Infrastructure -o src/MyProduct.Infrastructure
-dotnet new winforms -lang VB -n MyProduct.App -o src/MyProduct.App
-dotnet new xunit -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
+        Private ReadOnly _client As HttpClient
 
-# Add projects to solution
-dotnet sln add src/MyProduct.Core/MyProduct.Core.vbproj
-dotnet sln add src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj
-dotnet sln add src/MyProduct.App/MyProduct.App.vbproj
-dotnet sln add tests/MyProduct.Core.Tests/MyProduct.Core.Tests.vbproj
+        Public Sub New(factory As WebApplicationFactory(Of Program))
+            _client = factory _
+                .WithWebHostBuilder(Sub(builder)
+                    builder.ConfigureServices(Sub(services)
+                        ' テスト用にサービスを差し替える
+                        services.AddSingleton(Of IItemRepository, InMemoryItemRepository)()
+                    End Sub)
+                End Sub) _
+                .CreateClient()
+        End Sub
 
-# Add project references
-dotnet add src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
-dotnet add src/MyProduct.App/MyProduct.App.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
-dotnet add src/MyProduct.App/MyProduct.App.vbproj reference src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj
-dotnet add tests/MyProduct.Core.Tests/MyProduct.Core.Tests.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
+        <Fact>
+        Public Async Function GetAll_ReturnsOkStatus() As Task
+            ' Act
+            Dim response = Await _client.GetAsync("/api/items")
+
+            ' Assert
+            response.EnsureSuccessStatusCode()
+        End Function
+
+    End Class
+
+End Namespace
 ```
 
 ---
 
-## Tool Manifest
+## ソリューションセットアップコマンド
 
-### Create Tool Manifest
+### ソリューションとプロジェクトの作成
+
+```bash
+# ソリューションを作成
+dotnet new sln -n MyProduct
+
+# プロジェクトを作成
+dotnet new classlib -lang VB -n MyProduct.Core -o src/MyProduct.Core
+dotnet new classlib -lang VB -n MyProduct.Infrastructure -o src/MyProduct.Infrastructure
+dotnet new webapi -lang VB -n MyProduct.Api -o src/MyProduct.Api --use-minimal-apis
+dotnet new xunit -lang VB -n MyProduct.Core.Tests -o tests/MyProduct.Core.Tests
+dotnet new xunit -lang VB -n MyProduct.Api.IntegrationTests -o tests/MyProduct.Api.IntegrationTests
+
+# ソリューションにプロジェクトを追加
+dotnet sln add src/MyProduct.Core/MyProduct.Core.vbproj
+dotnet sln add src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj
+dotnet sln add src/MyProduct.Api/MyProduct.Api.vbproj
+dotnet sln add tests/MyProduct.Core.Tests/MyProduct.Core.Tests.vbproj
+dotnet sln add tests/MyProduct.Api.IntegrationTests/MyProduct.Api.IntegrationTests.vbproj
+
+# プロジェクト参照を追加
+dotnet add src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
+dotnet add src/MyProduct.Api/MyProduct.Api.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
+dotnet add src/MyProduct.Api/MyProduct.Api.vbproj reference src/MyProduct.Infrastructure/MyProduct.Infrastructure.vbproj
+dotnet add tests/MyProduct.Core.Tests/MyProduct.Core.Tests.vbproj reference src/MyProduct.Core/MyProduct.Core.vbproj
+dotnet add tests/MyProduct.Api.IntegrationTests/MyProduct.Api.IntegrationTests.vbproj reference src/MyProduct.Api/MyProduct.Api.vbproj
+```
+
+---
+
+## .NET Aspire アプリケーション
+
+> **注記**: .NET Aspire AppHost および ServiceDefaults は VB.NET 公式テンプレートを提供していない（現時点では C# 専用）。Aspire ソリューションの AppHost と ServiceDefaults は C# のままにしつつ、業務ロジックを含むマイクロサービス（Web API / Worker 等）を VB.NET で実装して Aspire に追加する混在構成が一般的。
+
+### Aspire AppHost
+
+```bash
+dotnet new aspire -n MyProduct
+```
+
+**作成される構造:**
+
+```text
+MyProduct/
+├── MyProduct.AppHost/
+│   ├── MyProduct.AppHost.csproj
+│   └── Program.cs
+├── MyProduct.ServiceDefaults/
+│   ├── MyProduct.ServiceDefaults.csproj
+│   └── Extensions.cs
+└── MyProduct.sln
+```
+
+**AppHost `Program.cs`:**
+
+```csharp
+var builder = DistributedApplication.CreateBuilder(args);
+
+var cache = builder.AddRedis("cache");
+var postgres = builder.AddPostgres("postgres")
+    .AddDatabase("ordersdb");
+
+var api = builder.AddProject<Projects.MyProduct_Api>("api")
+    .WithReference(cache)
+    .WithReference(postgres);
+
+builder.AddProject<Projects.MyProduct_Web>("web")
+    .WithReference(api);
+
+builder.Build().Run();
+```
+
+### 既存の Aspire ソリューションへのサービス追加
+
+```bash
+# 新しい API プロジェクトを追加
+dotnet new webapi -lang VB -n MyProduct.OrdersApi -o src/MyProduct.OrdersApi
+dotnet sln add src/MyProduct.OrdersApi/MyProduct.OrdersApi.vbproj
+
+# ServiceDefaults を参照
+dotnet add src/MyProduct.OrdersApi/MyProduct.OrdersApi.vbproj reference src/MyProduct.ServiceDefaults/MyProduct.ServiceDefaults.csproj
+```
+
+---
+
+## gRPC サービス
+
+> **注記**: `dotnet new grpc` は VB.NET 公式テンプレートが提供されていない。`-lang VB` を付けても VB.NET プロジェクトは生成されず、C# プロジェクトが作成される。VB.NET で gRPC サービスを実装したい場合は、空の ASP.NET Core プロジェクトに `Grpc.AspNetCore` NuGet パッケージを追加し、`.proto` ファイルからの生成コードと連携させる必要がある。本セクションは C# 実装を参考情報として掲載する。
+
+```bash
+dotnet new grpc -n MyProduct.GrpcService -o src/MyProduct.GrpcService
+```
+
+**Proto ファイルテンプレート:**
+
+```protobuf
+syntax = "proto3";
+
+option csharp_namespace = "MyProduct.GrpcService";
+
+package orders;
+
+service OrderService {
+  rpc GetOrder (GetOrderRequest) returns (OrderResponse);
+  rpc CreateOrder (CreateOrderRequest) returns (OrderResponse);
+  rpc ListOrders (ListOrdersRequest) returns (stream OrderResponse);
+}
+
+message GetOrderRequest {
+  string order_id = 1;
+}
+
+message CreateOrderRequest {
+  string customer_id = 1;
+  repeated OrderItem items = 2;
+}
+
+message OrderItem {
+  string product_id = 1;
+  int32 quantity = 2;
+}
+
+message OrderResponse {
+  string order_id = 1;
+  string customer_id = 2;
+  repeated OrderItem items = 3;
+  string status = 4;
+}
+
+message ListOrdersRequest {
+  string customer_id = 1;
+}
+```
+
+---
+
+## ツールマニフェスト
+
+### ツールマニフェストの作成
 
 ```bash
 dotnet new tool-manifest
 ```
 
-**Creates `.config/dotnet-tools.json`:**
+**`.config/dotnet-tools.json` が作成される:**
 
 ```json
 {
@@ -283,7 +595,7 @@ dotnet new tool-manifest
 }
 ```
 
-### Install Local Tools
+### ローカルツールのインストール
 
 ```bash
 dotnet tool install dotnet-ef
@@ -291,7 +603,7 @@ dotnet tool install dotnet-format
 dotnet tool install dotnet-reportgenerator-globaltool
 ```
 
-**Updated manifest:**
+**更新後のマニフェスト:**
 
 ```json
 {
@@ -314,7 +626,7 @@ dotnet tool install dotnet-reportgenerator-globaltool
 }
 ```
 
-### Restore Tools
+### ツールの復元
 
 ```bash
 dotnet tool restore
@@ -322,56 +634,17 @@ dotnet tool restore
 
 ---
 
-## Templates Not Available in VB.NET
+## クイックリファレンス: 一般的なテンプレートオプション
 
-The following templates do **not** support `-lang VB` and should not be used for VB.NET projects:
-
-| Template | Reason |
-|----------|---------|
-| `blazor`, `blazorserver`, `blazorwasm` | Blazor requires C# for component code-behind; no VB.NET support |
-| `maui`, `maui-blazor` | .NET MAUI targets are C# and XAML only; no VB.NET support |
-| `webapp` (Razor Pages) | Razor Pages and MVC use C#-specific code generation; no VB.NET support |
-| `mvc` | Same as above |
-| `grpc` | gRPC service templates are C#-only |
-| `worker` | The Worker Service template (`dotnet new worker`) does not support `-lang VB`; implement background services in VB.NET by referencing `Microsoft.Extensions.Hosting` and inheriting from `BackgroundService` manually |
-| `aspire`, `aspire-*` | .NET Aspire templates are C# only |
-| `webapi` | `dotnet new webapi` is C#/F#-only and does **not** support `-lang VB`. If you need VB for web work, create a `classlib` with `-lang VB` and host it manually (e.g., reference `Microsoft.AspNetCore.App` from a C# host project or wire up `WebApplication` in C# and consume VB class libraries) |
-| ML.NET templates | All ML.NET scaffolding templates are C# only |
-
-For background services in VB.NET, create a `classlib` or `console` project and inherit from `BackgroundService` directly:
-
-```vb
-Imports Microsoft.Extensions.Hosting
-
-Public Class MyWorker
-    Inherits BackgroundService
-
-    Protected Overrides Async Function ExecuteAsync(stoppingToken As CancellationToken) As Task
-        While Not stoppingToken.IsCancellationRequested
-            ' Do work here
-            Await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken)
-        End While
-    End Function
-
-End Class
-```
-
----
-
-## Quick Reference: VB.NET-Supported Templates
-
-| Template | Command | Key Options |
+| テンプレート | コマンド | 主なオプション |
 |----------|---------|-------------|
-| Console | `dotnet new console -lang VB` | `--framework` |
-| Class Library | `dotnet new classlib -lang VB` | `--framework` |
-| Windows Forms | `dotnet new winforms -lang VB` | `--framework` |
-| WPF | `dotnet new wpf -lang VB` | `--framework` |
+| コンソール | `dotnet new console -lang VB` | `--framework` |
+| クラスライブラリ | `dotnet new classlib -lang VB` | `--framework` |
+| Web API | `dotnet new webapi -lang VB` | `--use-controllers`, `--use-minimal-apis`, `--auth` |
+| Blazor | `dotnet new blazor` (VB.NET 非対応) | `--interactivity`, `--empty` |
+| ワーカー | `dotnet new worker -lang VB` | `--framework` |
 | xUnit | `dotnet new xunit -lang VB` | `--framework` |
-| NUnit | `dotnet new nunit -lang VB` | `--framework` |
-| MSTest | `dotnet new mstest -lang VB` | `--framework` |
-| Solution | `dotnet new sln` | — |
-| gitignore | `dotnet new gitignore` | — |
-| editorconfig | `dotnet new editorconfig` | — |
+| ソリューション | `dotnet new sln` | - |
+| gitignore | `dotnet new gitignore` | - |
+| editorconfig | `dotnet new editorconfig` | - |
 | global.json | `dotnet new globaljson` | `--sdk-version`, `--roll-forward` |
-
-> Note: `--use-program-main` is a C#-only flag and does not apply to VB. The VB `console` template always generates an explicit `Module Program` with `Sub Main` — there are no top-level statements in VB.

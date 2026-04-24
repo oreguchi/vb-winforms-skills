@@ -1,51 +1,51 @@
 ---
 name: vb-coding-standards
-description: "Write modern VB.NET code using idiomatic language features (classes, structures, async/await, extension methods, LINQ). Covers VB.NET equivalents or alternatives where C# has features VB does not (records, pattern matching, init-only setters, with expressions, primary constructors, ref structs)."
-compatibility: "Applies to VB.NET projects on .NET or .NET Framework. A few examples (Span(Of Char) overloads of Integer.Parse, UnsafeAccessorAttribute) require .NET 6+ / .NET 8+ and are called out inline."
+description: VB.NETで堅牢・高品質なコードを記述するための標準。Class/Structure ベースの値オブジェクト（record 非対応のため手書き Equals/GetHashCode）、Option Strict On、Async/Await、関数型スタイルの LINQ、Memory(Of T)/ArrayPool(Of T) による低アロケーションパターン、ベストプラクティスな API 設計パターンを中心に解説する。なお Span(Of T)/ReadOnlySpan(Of T) は BC30668 のため VB.NET では使用不可（ローカル変数・シグネチャともに不可）。
 invocable: false
 ---
 
-# Modern VB.NET Coding Standards
+# VB.NET コーディング標準
 
-## When to Use This Skill
+## このスキルを使う場面
 
-Use this skill when:
-- Writing new VB.NET code or refactoring existing code
-- Designing public APIs for libraries or services
-- Implementing domain models with strong typing
-- Building async/await-heavy applications
-- Working with binary data, buffers, or high-throughput scenarios
+次の場面で使用する。
+- 新規 VB.NET コードを書く、または既存コードをリファクタリングする
+- ライブラリやサービスの公開 API を設計する
+- パフォーマンスクリティカルなコードパスを最適化する
+- 強い型付けでドメインモデルを実装する
+- Async/Await を多用するアプリケーションを構築する
+- バイナリデータ、バッファ、高スループットシナリオを扱う
 
-## Reference Files
+## リファレンスファイル
 
-- [references/value-objects-and-patterns.md](references/value-objects-and-patterns.md): Full value object examples and alternative patterns
-- [references/performance-and-api-design.md](references/performance-and-api-design.md): Memory/buffer examples and API design principles
-- [references/composition-and-error-handling.md](references/composition-and-error-handling.md): Composition over inheritance, Result type, testing patterns
-- [references/anti-patterns-and-reflection.md](references/anti-patterns-and-reflection.md): Reflection avoidance and common anti-patterns
+- [value-objects-and-patterns.md](value-objects-and-patterns.md)：値オブジェクトの完全な実装例とパターンマッチング相当のコード
+- [performance-and-api-design.md](performance-and-api-design.md)：Memory(Of T)/ArrayPool(Of T) による低アロケーションパターンと API 設計原則（Span(Of T) は BC30668 のため VB.NET では使用不可）
+- [composition-and-error-handling.md](composition-and-error-handling.md)：継承よりコンポジション、Result 型、テストパターン
+- [anti-patterns-and-reflection.md](anti-patterns-and-reflection.md)：リフレクション回避と一般的なアンチパターン
 
-## Core Principles
+## コア原則
 
-1. **Immutability by Default** — Use `ReadOnly Property` and constructor-initialized fields; VB.NET does not have `record` types or `init`-only setters, but the same intent is achievable with `Public ReadOnly Property` set through a constructor.
-2. **Type Safety** — Declare explicit types; use `Nullable(Of T)` / `T?` and `If(x, y)` null-coalescing to handle nulls explicitly.
-3. **Conditional Branching** — Use `Select Case` for multi-branch dispatch; `If TypeOf x Is T Then` / `TryCast` for type-based branching. VB.NET does not support C#-style `switch` expressions or property patterns.
-4. **Async Everywhere** — Prefer `Async Function` with `CancellationToken` for all I/O.
-5. **Performance Awareness** — Consume `Span(Of T)` / `Memory(Of T)` APIs where available; VB.NET cannot *author* `ByRef`-struct types.
-6. **API Design** — Accept abstractions (`IEnumerable(Of T)`, `IReadOnlyList(Of T)`), return appropriately specific types.
-7. **Composition Over Inheritance** — Avoid deep abstract base class chains; prefer interfaces and composition.
-8. **Value Objects as Structures** — Use `Public Structure` with `ReadOnly` fields for small value types; implement `Equals` / `GetHashCode` manually.
-9. **Strict Compilation** — Set `Option Strict On` and `Option Explicit On` at the file or project level to enforce compile-time type checking and catch implicit conversions early.
+1. **デフォルトは不変（イミュータブル）** — `ReadOnly` プロパティとコンストラクタによる初期化を使用する（VB.NET に `record` / `init`-only は直接対応なし。§3b に基づき Class + ReadOnly Property で代替）
+2. **型の安全性** — `Option Strict On` を有効化し、値オブジェクトを活用する
+3. **条件分岐の明示化** — `Select Case` 文や `If`/`ElseIf` チェーンで条件ロジックを明快に書く（VB.NET に switch 式は直接対応なし。§3b に基づき Select Case 文で代替）
+4. **Async はあらゆる場所に** — すべての I/O 操作で Async/Await API を優先する
+5. **低アロケーションパターン** — パフォーマンスクリティカルなコードには `Memory(Of T)` と `ArrayPool(Of T)` を使用する（`Span(Of T)` / `ReadOnlySpan(Of T)` は BC30668 のため VB.NET では使用不可）
+6. **API 設計** — 抽象型を受け取り、適切に具体的な型を返す
+7. **継承よりコンポジション** — 抽象基底クラスを避け、コンポジションを優先する
+8. **値オブジェクトは Structure で** — 値オブジェクトには `Structure` + `ReadOnly` プロパティ + 手書き `Equals`/`GetHashCode` を使用する（VB.NET に `readonly record struct` は直接対応なし。§3b に基づき Structure で代替）
 
 ---
 
-## Language Patterns
+## 言語パターン
 
-### Immutable Data Objects (VB.NET equivalent of C# records)
+### 不変データの表現（VB.NETに直接対応なし — §3b に基づき Class + ReadOnly Property で代替）
 
-C# has `record` and `record struct` types that provide value equality, `with` expressions, and positional constructors automatically. **VB.NET does not have `record` types.** Use a `Class` with `ReadOnly Property` members and a constructor to achieve the same intent.
+C# では `record` 型を使って DTO、メッセージ、イベント、ドメインエンティティを表現する。VB.NET には `record` 糖衣構文が存在しないため、Class + ReadOnly Property + コンストラクタで同等の不変性を実現する。
 
-```vb
-' Simple immutable DTO — equivalent to C# "record CustomerDto(string Id, string Name, string Email)"
-Public Class CustomerDto
+```vbnet
+' シンプルな不変 DTO
+' （VB.NETには直接対応なし。§3bに基づきClass+コンストラクタで代替）
+Public NotInheritable Class CustomerDto
     Public ReadOnly Property Id As String
     Public ReadOnly Property Name As String
     Public ReadOnly Property Email As String
@@ -57,20 +57,22 @@ Public Class CustomerDto
     End Sub
 End Class
 
-' Immutable class with validation in constructor
-Public Class EmailAddress
+' バリデーション付き値オブジェクト（Class 版）
+' （VB.NETには直接対応なし。§3bに基づきClass+コンストラクタで代替）
+Public NotInheritable Class EmailAddress
     Public ReadOnly Property Value As String
 
     Public Sub New(value As String)
-        If String.IsNullOrWhiteSpace(value) OrElse Not value.Contains("@"c) Then
-            Throw New ArgumentException("Invalid email address", NameOf(value))
+        If String.IsNullOrWhiteSpace(value) OrElse Not value.Contains("@") Then
+            Throw New ArgumentException("無効なメールアドレスです。", NameOf(value))
         End If
         Me.Value = value
     End Sub
 End Class
 
-' Immutable class with a computed property
-Public Class ShoppingCart
+' コレクションを持つ不変クラス — IReadOnlyList(Of T) を使用
+' （VB.NETには直接対応なし。§3bに基づきClass+コンストラクタで代替）
+Public NotInheritable Class ShoppingCart
     Public ReadOnly Property CartId As String
     Public ReadOnly Property CustomerId As String
     Public ReadOnly Property Items As IReadOnlyList(Of CartItem)
@@ -89,37 +91,26 @@ Public Class ShoppingCart
 End Class
 ```
 
-> **C#-only feature — `with` expressions:** C# records support `with { Property = newValue }` to create a shallow copy with one or more fields changed. VB.NET has no equivalent syntax. Implement a copy helper method manually:
+**`Class` と `Structure` の使い分け：**
+- `Class`（参照型）：エンティティ、集約、多くのプロパティを持つ DTO
+- `Structure`（値型）：値オブジェクト（次のセクション参照）
 
-```vb
-' Manual "with"-style copy helper
-Public Function WithEmail(newEmail As String) As CustomerDto
-    Return New CustomerDto(Me.Id, Me.Name, newEmail)
-End Function
-```
+### 値オブジェクトは Structure + ReadOnly で（VB.NETに直接対応なし）
 
-> **C#-only feature — `init`-only setters:** C# supports `{ get; init; }` for properties that may only be set during object initialization. VB.NET has no `init` accessor. Use constructor-assigned `ReadOnly Property` instead (shown above).
+値オブジェクトには常に `Structure` + `ReadOnly` プロパティ + 手書き `Equals`/`GetHashCode` を使用する（C# の `readonly record struct` に相当）。暗黙的な変換演算子は使わず、明示的な変換のみを使う。
 
----
+（VB.NETには `readonly record struct` に直接対応なし。§3bに基づきStructure+手書きEqualsで代替）
 
-### Value Objects as Structures
-
-For small value types, use `Public Structure` with `ReadOnly` fields. Value equality must be implemented manually by overriding `Equals` and `GetHashCode` — there is no automatic structural equality as with C# `readonly record struct`.
-
-```vb
+```vbnet
 Public Structure OrderId
     Public ReadOnly Property Value As String
 
     Public Sub New(value As String)
         If String.IsNullOrWhiteSpace(value) Then
-            Throw New ArgumentException("OrderId cannot be empty", NameOf(value))
+            Throw New ArgumentException("OrderId を空にすることはできません。", NameOf(value))
         End If
         Me.Value = value
     End Sub
-
-    Public Shared Function [New]() As OrderId
-        Return New OrderId(Guid.NewGuid().ToString())
-    End Function
 
     Public Overrides Function ToString() As String
         Return Value
@@ -127,14 +118,17 @@ Public Structure OrderId
 
     Public Overrides Function Equals(obj As Object) As Boolean
         If TypeOf obj Is OrderId Then
-            Return DirectCast(obj, OrderId).Value = Me.Value
+            Dim other As OrderId = DirectCast(obj, OrderId)
+            Return Value = other.Value
         End If
         Return False
     End Function
 
     Public Overrides Function GetHashCode() As Integer
-        Return If(Value, String.Empty).GetHashCode()
+        Return If(Value IsNot Nothing, Value.GetHashCode(), 0)
     End Function
+    ' 暗黙的な変換は禁止 — 型安全性を損なう！
+    ' 内部値へのアクセスは orderId.Value を使うこと
 End Structure
 
 Public Structure Money
@@ -142,6 +136,9 @@ Public Structure Money
     Public ReadOnly Property Currency As String
 
     Public Sub New(amount As Decimal, currency As String)
+        If amount < 0 Then
+            Throw New ArgumentException("金額は負の値にできません。", NameOf(amount))
+        End If
         Me.Amount = amount
         Me.Currency = currency
     End Sub
@@ -154,436 +151,209 @@ Public Structure CustomerId
         Me.Value = value
     End Sub
 
-    Public Shared Function [New]() As CustomerId
+    Public Shared Function NewId() As CustomerId
         Return New CustomerId(Guid.NewGuid())
     End Function
 End Structure
 ```
 
-> **C#-only feature — `readonly record struct`:** C# `readonly record struct` gives structural equality, `with` support, and a positional constructor for free. VB.NET `Structure` provides value-type semantics but requires manual `Equals`/`GetHashCode` for proper value equality.
+完全な例（複数値オブジェクト、ファクトリパターン、暗黙的変換禁止ルール）は [value-objects-and-patterns.md](value-objects-and-patterns.md) を参照。
 
----
+### 条件分岐（Select Case と If/ElseIf）
 
-### Conditional Branching (VB.NET equivalent of C# pattern matching)
+VB.NET に C# の switch 式はない。`Select Case` 文、または条件ごとの `If`/`ElseIf` で同等のロジックを記述する。
 
-C# offers `switch` expressions, property patterns (`{ Prop: value }`), type patterns, and relational patterns. **VB.NET does not have these constructs.** Use `Select Case`, `If TypeOf x Is T Then`, and `TryCast` instead.
+（VB.NETには switch 式「x switch { ... }」に直接対応なし。§3bに基づきSelect Case文で代替）
 
-```vb
-' Multi-branch dispatch — equivalent to C# switch expression on a value
+```vbnet
 Public Function CalculateDiscount(order As Order) As Decimal
+    ' C# switch 式の代替 — Select Case + 一時変数
+    Dim discount As Decimal
+
     If order.Total > 1000D Then
-        Return order.Total * 0.15D
+        discount = order.Total * 0.15D
     ElseIf order.Total > 500D Then
-        Return order.Total * 0.10D
+        discount = order.Total * 0.10D
     ElseIf order.Total > 100D Then
-        Return order.Total * 0.05D
+        discount = order.Total * 0.05D
     Else
-        Return 0D
+        discount = 0D
     End If
-End Function
 
-' Select Case for simple value-based dispatch
-Public Function DescribeStatus(status As OrderStatus) As String
-    Select Case status
-        Case OrderStatus.Draft
-            Return "Draft order"
-        Case OrderStatus.Submitted
-            Return "Submitted, awaiting processing"
-        Case OrderStatus.Completed
-            Return "Order completed"
-        Case Else
-            Return "Unknown status"
-    End Select
-End Function
-
-' Type-based dispatch — equivalent to C# type pattern in switch
-Public Function GetLabel(obj As Object) As String
-    If TypeOf obj Is Order Then
-        Dim order = DirectCast(obj, Order)
-        Return $"Order {order.Id}"
-    ElseIf TypeOf obj Is Customer Then
-        Dim customer = DirectCast(obj, Customer)
-        Return $"Customer {customer.Name}"
-    Else
-        Return "Unknown"
-    End If
-End Function
-
-' Null-aware dispatch using TryCast
-Public Function GetDiscount(customer As Customer) As Decimal
-    If customer Is Nothing Then Return 0D
-    If customer.IsVip Then Return 0.2D
-    If customer.OrderCount > 10 Then Return 0.1D
-    Return 0.05D
+    Return discount
 End Function
 ```
 
-> **C#-only features:** C# property patterns (`{ IsVip: true }`), list patterns (`[first, ..]`), and `switch` expressions with `=>` arms are not available in VB.NET. The `If`/`ElseIf` and `Select Case` patterns above are the idiomatic VB.NET replacements.
+完全なパターンマッチング相当例は [value-objects-and-patterns.md](value-objects-and-patterns.md) を参照。
 
 ---
 
-### Null Handling
+### Null 許容型と Nothing チェック
 
-```vb
-' Null-conditional — same syntax as C#
-Dim name = user?.Name
+VB.NET では、値型の null 許容は `Nullable(Of T)` / `T?` で表現する。参照型は `Nothing` を許容するかどうかをコメントや命名で明示する。C# の `#nullable enable` に相当するコンパイラ警告の強化は `Option Strict On` と `#Enable Warning` で補完する。
 
-' Null-coalescing — use two-argument If() instead of ??
-Dim displayName = If(user?.Name, "Anonymous")
+```vbnet
+' プロジェクト設定（.vbproj / ソースファイル先頭）
+Option Strict On
+Option Infer On
 
-' ArgumentNullException guard
+' Null を返す可能性がある関数
+Public Function FindUserName(userId As String) As String
+    Dim user = _repository.Find(userId)
+    Return If(user IsNot Nothing, user.Name, Nothing)
+End Function
+
+' null 条件演算子（VB.NET でも使用可能）
+Public Function GetDiscountRate(customer As Customer) As Decimal
+    ' C# の switch 式 + null パターン の代替
+    ' （VB.NETには property pattern 等なし。§3bに基づきIf/ElseIfで代替）
+    If customer Is Nothing Then
+        Return 0D
+    ElseIf customer.IsVip Then
+        Return 0.20D
+    ElseIf customer.OrderCount > 10 Then
+        Return 0.10D
+    Else
+        Return 0.05D
+    End If
+End Function
+
+' ガード節（ArgumentNullException）
 Public Sub ProcessOrder(order As Order)
-    If order Is Nothing Then Throw New ArgumentNullException(NameOf(order))
+    If order Is Nothing Then
+        Throw New ArgumentNullException(NameOf(order))
+    End If
+    ' ここでは order は Nothing ではない
     Console.WriteLine(order.Id)
 End Sub
-
-' Nullable value type
-Dim count As Integer? = Nothing
-Dim actual = If(count, 0)   ' returns 0 when count is Nothing
 ```
 
 ---
 
-### Collections and Collection Initialization
+## 継承よりコンポジション
 
-```vb
-' Array literal — VB equivalent of C# collection expression [1, 2, 3]
-Dim numbers = {1, 2, 3}
+**抽象基底クラスを避ける。** インターフェイス + コンポジションを使う。共有ロジックには静的ヘルパーを使う。バリアントのモデリングにはファクトリメソッドを持つクラスを使う。
 
-' List initialization — equivalent to C# new List<int> { 1, 2, 3 }
-Dim list As New List(Of Integer) From {1, 2, 3}
-
-' Dictionary initialization
-Dim map As New Dictionary(Of String, Integer) From {
-    {"one", 1},
-    {"two", 2}
-}
-
-' IReadOnlyList accepted from caller — prefer abstractions
-Public Function ProcessItems(items As IReadOnlyList(Of OrderItem)) As Decimal
-    Return items.Sum(Function(i) i.Price)
-End Function
-```
-
-> **C#-only feature — collection expressions:** C# 12 introduced `[1, 2, 3]` collection expressions that can target arrays, lists, and spans via spread syntax. VB.NET uses `{1, 2, 3}` for array literals and `New List(Of T) From {…}` for lists.
+完全な例は [composition-and-error-handling.md](composition-and-error-handling.md) を参照。
 
 ---
 
-### Async/Await
+## パフォーマンスパターン
 
-Async/await is fully supported in VB.NET.
+### Async/Await のベストプラクティス
 
-```vb
-' Async all the way — always accept CancellationToken
-Public Async Function GetOrderAsync(orderId As String, cancellationToken As CancellationToken) As Task(Of Order)
+```vbnet
+' すべて Async — 常に CancellationToken を受け取る
+Public Async Function GetOrderAsync(
+    orderId As String,
+    cancellationToken As CancellationToken) As Task(Of Order)
+
     Dim order = Await _repository.GetAsync(orderId, cancellationToken)
     Return order
 End Function
 
-' ValueTask for frequently-called, often-synchronous methods
-Public Function GetCachedOrderAsync(orderId As String, cancellationToken As CancellationToken) As ValueTask(Of Order)
-    Dim cached As Order = Nothing
-    If _cache.TryGetValue(orderId, cached) Then
-        Return New ValueTask(Of Order)(cached)
+' ValueTask(Of T) — 頻繁に呼ばれ、多くの場合同期的に完了するメソッドに使用
+Public Function GetCachedOrderAsync(
+    orderId As String,
+    cancellationToken As CancellationToken) As ValueTask(Of Order)
+
+    Dim order As Order = Nothing
+    If _cache.TryGetValue(orderId, order) Then
+        Return New ValueTask(Of Order)(order)
     End If
     Return New ValueTask(Of Order)(GetFromDatabaseAsync(orderId, cancellationToken))
 End Function
 
-' Consuming IAsyncEnumerable — VB.NET has NO "Await For Each" statement.
-' Use a manual IAsyncEnumerator(Of T) loop with MoveNextAsync / DisposeAsync.
-Public Async Function PrintOrdersAsync(customerId As String, cancellationToken As CancellationToken) As Task
-    Dim source = _repository.StreamAllAsync(cancellationToken)
-    Dim enumerator = source.GetAsyncEnumerator()
+' IAsyncEnumerable(Of T) — ストリーミング
+' **VB.NET 制約**: VB.NET は同一メソッドに `Iterator` と `Async` を同時指定できないため、
+' `IAsyncEnumerable(Of T)` を `Async Iterator Function` で実装することは**コンパイル不可**。
+' また、VB.NET は Await For Each / Finally 内 Await のいずれも未対応。以下は IAsyncEnumerator を手動操作する代替パターン。
+' 実装時は `AsyncEnumerable.Create(...)`（System.Linq.Async 等のヘルパー）または
+' `IAsyncEnumerator(Of T)` の手動実装が必要となる。
+' ※ 擬似コード（コンパイル不可） ↓
+Public Async Iterator Function StreamOrdersAsync(
+    customerId As String,
+    Optional cancellationToken As CancellationToken = Nothing) As IAsyncEnumerable(Of Order)
+
+    ' [擬似コードのため省略 — 実際は下記 IAsyncEnumerator パターンを使用]
+    ' Await For Each は VB.NET 非対応。代替は IAsyncEnumerator(Of T) の手動操作：
+    Dim enumerator = _repository.StreamAllAsync(cancellationToken).GetAsyncEnumerator(cancellationToken)
+    Dim thrown As Exception = Nothing
     Try
         While Await enumerator.MoveNextAsync()
             Dim order = enumerator.Current
             If order.CustomerId = customerId Then
-                Console.WriteLine(order.Id)
+                Yield order
             End If
         End While
-    Finally
-        Await enumerator.DisposeAsync()
+    Catch ex As Exception
+        thrown = ex
     End Try
+    Await enumerator.DisposeAsync()  ' Finally 内の Await は BC36943 のため不可 — Try/Catch 後に呼ぶ
+    If thrown IsNot Nothing Then
+        Throw thrown
+    End If
 End Function
 ```
 
-> **VB.NET limitation — consuming and authoring async streams:** VB.NET does **not** have an `Await For Each` statement (that is C# `await foreach` syntax). To consume an `IAsyncEnumerable(Of T)` in VB.NET, obtain an `IAsyncEnumerator(Of T)` via `GetAsyncEnumerator()` and loop with `While Await enumerator.MoveNextAsync()`, ensuring `Await enumerator.DisposeAsync()` runs in a `Finally` block (as shown above). Authoring an `IAsyncEnumerable(Of T)` — i.e., an `Async` iterator using `yield return` — is a **C#-only** feature; VB.NET does not support combining `Yield` with `Async`. If you need to *produce* an async stream, implement the iterator in a C# class library and consume it from VB using the manual enumerator pattern above.
+**重要なルール：**
+- `CancellationToken` は常に `= Nothing`（デフォルト）付きで受け取る
+- ライブラリコードでは `ConfigureAwait(False)` を使用する
+- Async コードをブロックしない（`.Result` や `.Wait()` は使わない）
+- タイムアウトにはリンクされた CancellationTokenSource を使用する
 
-**Key async rules:**
-- Always accept `CancellationToken` with `Optional cancellationToken As CancellationToken = Nothing`
-- Use `ConfigureAwait(False)` in library code
-- Never block on async code (no `.Result` or `.Wait()`)
+### Memory(Of T) と ArrayPool(Of T)
 
-```vb
-' ConfigureAwait(False) example - REQUIRED in library/class-library code to avoid
-' capturing a SynchronizationContext (e.g. the WinForms UI thread) on resumption.
-' Do NOT use ConfigureAwait(False) in WinForms UI event handlers that must
-' touch controls after the await - those need the captured UI context.
-Public Async Function ReadConfigAsync(path As String,
-                                      cancellationToken As CancellationToken) As Task(Of String)
-    Using reader As New StreamReader(path)
-        Return Await reader.ReadToEndAsync().ConfigureAwait(False)
-    End Using
-End Function
-```
+**VB.NET の制約**：`Span(Of T)` / `ReadOnlySpan(Of T)` は ref struct セマンティクスを持つため、VB.NET では**ローカル変数にもメソッドシグネチャにも使用できない**（BC30668）。
+
+VB.NET で使用可能な低アロケーションパターン：
+- `Memory(Of T)` — Async I/O バッファ（`Stream.ReadAsync(Memory(Of Byte))` 等）
+- `ArrayPool(Of T)` — 大きな一時バッファのプーリングで GC 圧力を削減
+- 文字列解析は `String.IndexOf` + `String.Substring` で代替（Span のゼロアロケーション効果は得られないが正確に動作する）
+
+完全な例と API 設計セクションは [performance-and-api-design.md](performance-and-api-design.md) を参照。
 
 ---
 
-### Span(Of T) and Memory(Of T)
+## エラー処理：Result 型
 
-Use `Span(Of T)` for synchronous zero-allocation operations and `Memory(Of T)` for async scenarios. Use `ArrayPool(Of T)` for large temporary buffers.
+期待されるエラーには例外ではなく `Result` 型（ドメイン固有の結果型）を使用する。例外は予期しない / システムエラーにのみ使う。
 
-```vb
-' Consuming a Span-based API (fully supported in VB.NET).
-' NOTE: Integer.Parse(ReadOnlySpan(Of Char)) is a .NET Core 2.1+ / .NET 5+ overload
-' and is NOT available on .NET Framework. On .NET Framework, materialize a String
-' first (e.g. Integer.Parse(segment.ToString())).
-Public Function ParseFirstInt(text As String) As Integer
-    Dim span As ReadOnlySpan(Of Char) = text.AsSpan()
-    Dim commaIndex = span.IndexOf(","c)
-    Dim segment = If(commaIndex >= 0, span.Slice(0, commaIndex), span)
-    Return Integer.Parse(segment)
-End Function
-
-' ArrayPool for large buffers
-Public Function ProcessData(data As Byte()) As Integer
-    Dim buffer = ArrayPool(Of Byte).Shared.Rent(4096)
-    Try
-        ' ... process using buffer ...
-        Return 0
-    Finally
-        ArrayPool(Of Byte).Shared.Return(buffer)
-    End Try
-End Function
-```
-
-> **C#-only feature — authoring `ref struct` / `Span`-backed types:** C# can declare `ref struct` types (like `Span(Of T)` itself), functions that return `ref`, and parameters marked `in` / `ref readonly`. VB.NET fully supports `ByRef` parameters (the equivalent of C# `ref`), but **does not support `ByRef`-returning functions, `ref struct` authoring, or `In` / `ref readonly` parameter authoring**. VB.NET is a *consumer* of Span-based APIs, not an author of new `ref struct` types. If you need to author high-performance buffer types, implement them in a C# project and reference that assembly from VB.
+完全な Result 型の実装と使用例は [composition-and-error-handling.md](composition-and-error-handling.md) を参照。
 
 ---
 
-### LINQ
+## リフレクションベースのメタプログラミングを避ける
 
-Both method syntax and query syntax are supported in VB.NET.
+**禁止：** AutoMapper、Mapster、ExpressMapper。明示的なマッピング拡張メソッドを代わりに使用する。プライベートメンバーへのアクセスが本当に必要な場合は `UnsafeAccessorAttribute`（.NET 8+）を使用する。
 
-```vb
-' Method syntax — identical to C# except lambda uses Function keyword
-Dim results = list.Where(Function(x) x > 0).Select(Function(x) x * 2).ToList()
-
-' Query syntax — natural in VB.NET
-Dim queryResults = From x In list
-                   Where x > 0
-                   Select x * 2
-
-' Aggregates
-Dim total = orders.Sum(Function(o) o.Total)
-Dim count = orders.Count(Function(o) o.Status = OrderStatus.Completed)
-
-' Grouping
-Dim byStatus = From o In orders
-               Group o By o.Status Into Group
-               Select Status, Items = Group.ToList()
-```
+詳細なガイダンスは [anti-patterns-and-reflection.md](anti-patterns-and-reflection.md) を参照。
 
 ---
 
-### Extension Methods
+## コードの整理
 
-VB.NET requires the `<Extension()>` attribute on the method, and the method must be in a `Module` (not a `Class`).
-
-```vb
-Imports System.Runtime.CompilerServices
-
-Public Module StringExtensions
-    <Extension()>
-    Public Function IsNullOrBlank(value As String) As Boolean
-        Return String.IsNullOrWhiteSpace(value)
-    End Function
-
-    <Extension()>
-    Public Function Truncate(value As String, maxLength As Integer) As String
-        If value Is Nothing Then Return Nothing
-        Return If(value.Length <= maxLength, value, value.Substring(0, maxLength))
-    End Function
-End Module
-
-' Usage
-If someString.IsNullOrBlank() Then ...
-```
-
----
-
-### Tuples
-
-```vb
-' Declare a tuple return type
-Public Function GetCoordinates() As (X As Integer, Y As Integer)
-    Return (10, 20)
-End Function
-
-' Access tuple components — VB.NET does NOT support C#-style deconstruction
-' declarations ("var (x, y) = ...").  Access fields by name (for named tuples)
-' or by Item1/Item2/... for unnamed tuples.
-Dim coord = GetCoordinates()
-Dim x = coord.X
-Dim y = coord.Y
-
-' Named tuple fields
-Dim point = (X:=5, Y:=10)
-Console.WriteLine(point.X)
-
-' Unnamed tuple — access via Item1 / Item2
-Dim pair = (10, 20)
-Dim first = pair.Item1
-Dim second = pair.Item2
-```
-
-> **VB.NET vs. C# tuples:** VB.NET supports tuple types and named fields, but has no deconstruction-declaration syntax (`Dim (x, y) = expr` is **not** valid VB.NET). Access tuple components by their name (e.g. `coord.X`) or by positional `ItemN` members (e.g. `coord.Item1`).
-
----
-
-### String Interpolation and String Utilities
-
-```vb
-' String interpolation — same $ syntax as C# (VB 14+)
-Dim greeting = $"Hello, {name}! You have {count} messages."
-
-' NameOf operator
-Public Sub SetName(value As String)
-    If value Is Nothing Then Throw New ArgumentNullException(NameOf(value))
-    _name = value
-End Sub
-
-' Multi-line strings — VB.NET does not have raw string literals (C# """ syntax)
-' Use string concatenation or StringBuilder for multi-line content
-Dim multiLine = "Line one" & Environment.NewLine &
-                "Line two" & Environment.NewLine &
-                "Line three"
-
-' Or use an XML literal for structured text
-Dim xml = <root>
-              <item>value</item>
-          </root>
-```
-
-> **C#-only feature — raw string literals:** C# 11 introduced `"""…"""` raw string literals that avoid the need for escape sequences. VB.NET does not have raw string literals. Use string concatenation, `StringBuilder`, or XML literals for multi-line or special-character content.
-
----
-
-### Primary Constructors (C# 12)
-
-> **C#-only feature:** C# 12 introduced primary constructors, which allow constructor parameters to be declared directly on the class/struct declaration. VB.NET does not have primary constructors. Use a standard `Public Sub New(…)` constructor.
-
-```vb
-' VB.NET equivalent of a C# primary constructor class
-Public Class OrderProcessor
-    Private ReadOnly _repository As IOrderRepository
-    Private ReadOnly _logger As ILogger
-
-    Public Sub New(repository As IOrderRepository, logger As ILogger)
-        _repository = repository
-        _logger = logger
-    End Sub
-
-    Public Async Function ProcessAsync(orderId As String) As Task
-        Dim order = Await _repository.GetAsync(orderId, CancellationToken.None)
-        _logger.LogInformation("Processing order {OrderId}", orderId)
-    End Function
-End Class
-```
-
----
-
-## Composition Over Inheritance
-
-Avoid abstract base classes. Use interfaces and composition. Use shared helper methods in a `Module` for utility logic shared across multiple classes.
-
-```vb
-' Prefer interface + composition
-Public Interface IOrderValidator
-    Function Validate(order As Order) As ValidationResult
-End Interface
-
-Public Class OrderService
-    Private ReadOnly _repository As IOrderRepository
-    Private ReadOnly _validator As IOrderValidator
-
-    Public Sub New(repository As IOrderRepository, validator As IOrderValidator)
-        _repository = repository
-        _validator = validator
-    End Sub
-End Class
-```
-
----
-
-## Error Handling: Result Type
-
-For expected business errors, use a `Result(Of T, TError)` type instead of exceptions. Use exceptions only for unexpected or system-level errors.
-
-```vb
-' Simple Result type
-Public Class Result(Of TValue, TError)
-    Public ReadOnly Property IsSuccess As Boolean
-    Public ReadOnly Property Value As TValue
-    Public ReadOnly Property [Error] As TError
-
-    Private Sub New(isSuccess As Boolean, value As TValue, [error] As TError)
-        Me.IsSuccess = isSuccess
-        Me.Value = value
-        Me.[Error] = [error]
-    End Sub
-
-    Public Shared Function Success(value As TValue) As Result(Of TValue, TError)
-        Return New Result(Of TValue, TError)(True, value, Nothing)
-    End Function
-
-    Public Shared Function Failure([error] As TError) As Result(Of TValue, TError)
-        Return New Result(Of TValue, TError)(False, Nothing, [error])
-    End Function
-End Class
-```
-
----
-
-## Avoid Reflection-Based Metaprogramming
-
-**Avoid:** AutoMapper, Mapster, and similar convention-based mapping libraries. Use explicit mapping methods instead. When private member access is genuinely needed on .NET 8+, use `UnsafeAccessorAttribute`.
-
-```vb
-' Explicit mapping extension method — no reflection
-Imports System.Runtime.CompilerServices
-
-Public Module CustomerMappingExtensions
-    <Extension()>
-    Public Function ToDto(customer As Customer) As CustomerDto
-        Return New CustomerDto(
-            customer.Id.ToString(),
-            customer.Name,
-            customer.Email.Value
-        )
-    End Function
-End Module
-```
-
----
-
-## Code Organization
-
-```vb
-' File: Domain/Orders/Order.vb
+```vbnet
+' ファイル: Domain/Orders/Order.vb
 
 Namespace MyApp.Domain.Orders
 
-    ' 1. Primary domain type
-    Public Class Order
+    ' 1. 主要ドメイン型
+    ' （VB.NETには直接対応なし。§3bに基づきClass+コンストラクタで代替）
+    Public NotInheritable Class Order
         Public ReadOnly Property Id As OrderId
         Public ReadOnly Property CustomerId As CustomerId
         Public ReadOnly Property Total As Money
         Public ReadOnly Property Status As OrderStatus
         Public ReadOnly Property Items As IReadOnlyList(Of OrderItem)
 
-        Public Sub New(id As OrderId, customerId As CustomerId, total As Money,
-                       status As OrderStatus, items As IReadOnlyList(Of OrderItem))
+        Public Sub New(
+            id As OrderId,
+            customerId As CustomerId,
+            total As Money,
+            status As OrderStatus,
+            items As IReadOnlyList(Of OrderItem))
+
             Me.Id = id
             Me.CustomerId = customerId
             Me.Total = total
@@ -597,24 +367,28 @@ Namespace MyApp.Domain.Orders
             End Get
         End Property
 
-        Public Function AddItem(item As OrderItem) As Result(Of Order, OrderError)
+        Public Function AddItem(item As OrderItem) As CreateOrderResult
             If Status <> OrderStatus.Draft Then
-                Return Result(Of Order, OrderError).Failure(
-                    New OrderError("ORDER_NOT_DRAFT", "Can only add items to draft orders"))
+                Return CreateOrderResult.Failed(
+                    OrderErrorCode.ValidationError,
+                    "下書き状態の注文にのみ商品を追加できます。")
             End If
 
             Dim newItems As New List(Of OrderItem)(Items)
             newItems.Add(item)
 
-            Dim newAmount = Items.Sum(Function(i) i.Total.Amount) + item.Total.Amount
-            Dim newTotal As New Money(newAmount, Total.Currency)
+            Dim newTotal As New Money(
+                Items.Sum(Function(i) i.Total.Amount) + item.Total.Amount,
+                Total.Currency)
 
-            Return Result(Of Order, OrderError).Success(
-                New Order(Id, CustomerId, newTotal, Status, newItems.AsReadOnly()))
+            ' C# の `with` 式の代替 — 新しいオブジェクトを手動で構築する
+            ' （VB.NETには `with` 式に直接対応なし。§3bに基づきコンストラクタで代替）
+            Dim newOrder As New Order(Id, CustomerId, newTotal, Status, newItems.AsReadOnly())
+            Return CreateOrderResult.Success(newOrder)
         End Function
     End Class
 
-    ' 2. Enum for state
+    ' 2. 状態を表す列挙型
     Public Enum OrderStatus
         Draft
         Submitted
@@ -623,8 +397,9 @@ Namespace MyApp.Domain.Orders
         Cancelled
     End Enum
 
-    ' 3. Related type
-    Public Class OrderItem
+    ' 3. 関連型
+    ' （VB.NETには直接対応なし。§3bに基づきClass+コンストラクタで代替）
+    Public NotInheritable Class OrderItem
         Public ReadOnly Property ProductId As ProductId
         Public ReadOnly Property Quantity As Quantity
         Public ReadOnly Property UnitPrice As Money
@@ -642,7 +417,8 @@ Namespace MyApp.Domain.Orders
         End Property
     End Class
 
-    ' 4. Value objects
+    ' 4. 値オブジェクト
+    ' （VB.NETには `readonly record struct` に直接対応なし。§3bに基づきStructureで代替）
     Public Structure OrderId
         Public ReadOnly Property Value As Guid
 
@@ -650,12 +426,24 @@ Namespace MyApp.Domain.Orders
             Me.Value = value
         End Sub
 
-        Public Shared Function [New]() As OrderId
+        Public Shared Function NewId() As OrderId
             Return New OrderId(Guid.NewGuid())
+        End Function
+
+        Public Overrides Function Equals(obj As Object) As Boolean
+            If TypeOf obj Is OrderId Then
+                Return DirectCast(obj, OrderId).Value = Value
+            End If
+            Return False
+        End Function
+
+        Public Overrides Function GetHashCode() As Integer
+            Return Value.GetHashCode()
         End Function
     End Structure
 
-    ' 5. Error type
+    ' 5. エラー型
+    ' （VB.NETには `readonly record struct` に直接対応なし。§3bに基づきStructureで代替）
     Public Structure OrderError
         Public ReadOnly Property Code As String
         Public ReadOnly Property Message As String
@@ -671,60 +459,40 @@ End Namespace
 
 ---
 
-## Best Practices Summary
+## ベストプラクティスまとめ
 
-### DO's
-- Use `Class` with `ReadOnly Property` and a constructor for immutable DTOs and domain entities (VB.NET equivalent of C# `record`)
-- Use `Structure` with `ReadOnly` fields for value objects; implement `Equals`/`GetHashCode` manually
-- Use `Select Case` and `If`/`ElseIf` chains for multi-branch logic (VB.NET equivalent of C# pattern matching)
-- Use `If(x, y)` for null-coalescing (equivalent of C# `??`)
-- Use `x?.Prop` for null-conditional member access
-- Use async/await (`Async Function … As Task(Of T)`) for all I/O operations
-- Accept `CancellationToken` in all async methods
-- Use `Span(Of T)` and `Memory(Of T)` APIs for high-performance scenarios (consumer role)
-- Accept abstractions (`IEnumerable(Of T)`, `IReadOnlyList(Of T)`)
-- Use `Result(Of T, TError)` for expected business errors
-- Pool buffers with `ArrayPool(Of T)` for large allocations
-- Prefer composition over inheritance
-- Define extension methods in a `Module` with `<Extension()>` attribute
+### すること（DO）
+- DTO、メッセージ、ドメインエンティティには Class + ReadOnly プロパティ + コンストラクタを使う
+- 値オブジェクトには Structure + ReadOnly + 手書き Equals/GetHashCode を使う
+- `Select Case` 文や `If`/`ElseIf` チェーンで条件ロジックを明快に書く
+- `Option Strict On` を有効にし、Null 許容性を明示的に扱う
+- すべての I/O 操作で Async/Await を使う
+- すべての Async メソッドで `CancellationToken` を受け取る
+- パフォーマンスクリティカルなシナリオには `Memory(Of T)` と `ArrayPool(Of T)` を使う（`Span(Of T)` は VB.NET 未対応 — BC30668）
+- 抽象型（`IEnumerable(Of T)`、`IReadOnlyList(Of T)`）を受け取る
+- 期待されるエラーには `Result` 型（ドメイン固有の結果型）を使う
+- 大きなアロケーションのバッファプーリングには `ArrayPool(Of T)` を使う
+- 継承よりコンポジションを優先する
 
-### DON'Ts
-- Don't use mutable public fields; use `Property` or `ReadOnly Property`
-- Don't create deep inheritance hierarchies
-- Don't block on async code (`.Result`, `.Wait()`)
-- Don't use `byte()` buffers for every operation when `Span(Of Byte)` APIs are available
-- Don't forget `CancellationToken` parameters in async methods
-- Don't return mutable collections from public APIs; return `IReadOnlyList(Of T)` or similar
-- Don't throw exceptions for expected business errors; use `Result`
-- Don't allocate large arrays repeatedly; use `ArrayPool`
-- Don't use reflection-based mapping libraries; write explicit mapping methods
+### してはいけないこと（DON'T）
+- Class が使えるときにミュータブルな DTO を作らない
+- 値オブジェクトに Class を使わない（Structure を使う）
+- 深い継承階層を作らない
+- Null 許容の警告を無視しない
+- Async コードをブロックしない（`.Result`、`.Wait()`）
+- 大きな一時バッファをメソッド呼び出しのたびに `New Byte(n) {}` で確保しない — `ArrayPool(Of T)` を使う（`Span(Of T)` は VB.NET でローカル変数にも使えないため BC30668。代替として配列インデックスアクセスを使う）
+- `CancellationToken` パラメータを忘れない
+- API からミュータブルなコレクションを返さない
+- 期待されるビジネスエラーに例外を使わない
+- 繰り返し大きな配列を確保しない（`ArrayPool` を使う）
 
----
-
-## C#-Only Features — Quick Reference
-
-The following C# features have **no direct VB.NET equivalent**. The VB.NET approach for each is described above in the relevant section.
-
-| C# Feature | VB.NET Approach |
-|---|---|
-| `record` / `record class` | `Class` with `ReadOnly Property` + constructor |
-| `readonly record struct` | `Structure` with `ReadOnly` fields; manual `Equals`/`GetHashCode` |
-| `init`-only setters (`{ get; init; }`) | Constructor-assigned `ReadOnly Property` |
-| `with` expressions | Manual copy/clone method |
-| Primary constructors (C# 12) | Standard `Public Sub New(…)` |
-| `switch` expressions and property patterns | `If`/`ElseIf` chains, `Select Case`, `TypeOf`/`DirectCast` |
-| Collection expressions `[1, 2, 3]` | `{1, 2, 3}` (array), `New List(Of T) From {…}` |
-| Raw string literals `"""…"""` (C# 11) | String concatenation, `StringBuilder`, XML literals |
-| `ref struct` / `ref` fields authorship | Not supported; use C# project for authoring |
-| `IAsyncEnumerable(Of T)` authorship (async `yield return`) | Not supported in VB.NET; author in C#. Consume from VB via a manual `GetAsyncEnumerator` + `While Await MoveNextAsync()` loop (no `Await For Each` statement exists in VB.NET) |
+詳細なアンチパターン例は [anti-patterns-and-reflection.md](anti-patterns-and-reflection.md) を参照。
 
 ---
 
-## Additional Resources
+## 追加リソース
 
-- **VB.NET Language Reference**: https://learn.microsoft.com/en-us/dotnet/visual-basic/
-- **VB.NET Programming Guide**: https://learn.microsoft.com/en-us/dotnet/visual-basic/programming-guide/
-- **Async/Await in VB.NET**: https://learn.microsoft.com/en-us/dotnet/visual-basic/programming-guide/concepts/async/
-- **LINQ in VB.NET**: https://learn.microsoft.com/en-us/dotnet/visual-basic/programming-guide/concepts/linq/
-- **Memory and Spans**: https://learn.microsoft.com/en-us/dotnet/standard/memory-and-spans/
-- **Async Best Practices**: https://learn.microsoft.com/en-us/archive/msdn-magazine/2013/march/async-await-best-practices-in-asynchronous-programming
+- **VB.NET 言語リファレンス**：https://learn.microsoft.com/ja-jp/dotnet/visual-basic/
+- **Memory(Of T) と Span(Of T)（C# 参考）**：https://learn.microsoft.com/ja-jp/dotnet/standard/memory-and-spans/（Span は VB.NET 未対応 BC30668。Memory と ArrayPool は VB.NET で使用可）
+- **非同期プログラミングのベストプラクティス**：https://learn.microsoft.com/ja-jp/archive/msdn-magazine/2013/march/async-await-best-practices-in-asynchronous-programming
+- **.NET パフォーマンスのヒント**：https://learn.microsoft.com/ja-jp/dotnet/framework/performance/

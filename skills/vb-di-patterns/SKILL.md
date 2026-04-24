@@ -1,154 +1,115 @@
 ---
 name: vb-di-patterns
-description: "Organize dependency injection registrations in VB.NET Windows Forms applications using IServiceCollection extension methods. Covers lifetimes, form constructor injection, scoped services inside long-lived forms, factories, keyed services, and the ServiceProvider + Application.Run bootstrap pattern."
-compatibility: "Applies to VB.NET projects on .NET 6+ using Microsoft.Extensions.DependencyInjection."
+description: IServiceCollection拡張メソッドを使用してDI登録を整理する。関連するサービスをコンポーザブルなAdd*メソッドにグループ化し、Program.vbをクリーンに保つとともに、テストで設定を再利用可能にする。VB.NET構文では<Extension>属性とModuleを使用して拡張メソッドを定義する。
+invocable: false
 ---
 
-# VB.NET WinForms Dependency Injection Patterns
+# 依存性注入（DI）パターン
 
-## When to Use This Skill
+## このスキルを使う場面
 
-Use this skill when:
-- Organizing service registrations in a VB.NET Windows Forms application
-- Avoiding a massive `Program.vb` with hundreds of `AddXxx` calls
-- Injecting services (loggers, repositories, business services) into Forms
-- Managing scoped services (like `DbContext`) inside long-lived forms
-- Making service configuration reusable between production and tests
+次の場面で使用する。
+- ASP.NET CoreアプリケーションでサービスのDI登録を整理したい
+- 数百行の登録コードで肥大化したProgram.vbやStartup.vbを解消したい
+- 本番環境とテストでサービス設定を再利用したい
+- Microsoft.Extensions.DependencyInjectionと統合するライブラリを設計したい
 
-## Reference Files
+## 参考ファイル
 
-- [advanced-patterns.md](references/advanced-patterns.md): Testing, scope management inside long-lived Forms, conditional/factory/keyed registration patterns
+- [advanced-patterns.md](advanced-patterns.md): DI拡張メソッドを使ったテスト、Akka.NETアクタースコープ管理、条件付き登録・ファクトリ登録・キー付き登録パターン
 
 ---
 
-## The Problem
+## 問題
 
-Without organization, `Program.vb` becomes unmanageable:
+整理しないと、Program.vbは管理不能になる。
 
-```vb
-' BAD: 200+ lines of unorganized registrations in Program.vb
-Imports Microsoft.Extensions.DependencyInjection
+```vbnet
+' BAD: 200行以上の無秩序な登録
+Dim builder = WebApplication.CreateBuilder(args)
 
-Module Program
-    <STAThread>
-    Sub Main()
-        Application.EnableVisualStyles()
-        Application.SetCompatibleTextRenderingDefault(False)
-
-        Dim services As New ServiceCollection()
-
-        services.AddScoped(Of ICustomerRepository, CustomerRepository)()
-        services.AddScoped(Of IOrderRepository, OrderRepository)()
-        services.AddScoped(Of IProductRepository, ProductRepository)()
-        services.AddScoped(Of ICustomerService, CustomerService)()
-        ' ... 150 more lines ...
-
-        services.AddTransient(Of MainForm)()
-
-        Using sp = services.BuildServiceProvider()
-            Application.Run(sp.GetRequiredService(Of MainForm)())
-        End Using
-    End Sub
-End Module
+builder.Services.AddScoped(Of IUserRepository, UserRepository)()
+builder.Services.AddScoped(Of IOrderRepository, OrderRepository)()
+builder.Services.AddScoped(Of IProductRepository, ProductRepository)()
+builder.Services.AddScoped(Of IUserService, UserService)()
+' ... さらに150行 ...
 ```
 
-Problems: hard to find related registrations, no clear boundaries, can't reuse in tests, merge conflicts.
+問題点：関連する登録を見つけにくい、境界が不明瞭、テストで再利用できない、マージコンフリクトが発生しやすい。
 
 ---
 
-## The Solution: Extension Method Composition
+## 解決策：拡張メソッドによるコンポジション
 
-VB.NET supports extension methods on any interface (including `IServiceCollection`) when declared inside a `Module` with the `<Extension()>` attribute. Group related registrations into extension methods, then compose them in `Program.vb`:
+関連する登録を拡張メソッドにグループ化する。
 
-```vb
-' GOOD: Clean, composable Program.vb
-Imports Microsoft.Extensions.DependencyInjection
+```vbnet
+' GOOD: クリーンでコンポーザブルなProgram.vb
+Dim builder = WebApplication.CreateBuilder(args)
 
-Module Program
-    <STAThread>
-    Sub Main()
-        Application.EnableVisualStyles()
-        Application.SetCompatibleTextRenderingDefault(False)
+builder.Services _
+    .AddUserServices() _
+    .AddOrderServices() _
+    .AddEmailServices() _
+    .AddPaymentServices() _
+    .AddValidators()
 
-        Dim services As New ServiceCollection()
-
-        services _
-            .AddCustomerServices() _
-            .AddOrderServices() _
-            .AddEmailServices() _
-            .AddPaymentServices() _
-            .AddValidators() _
-            .AddForms()
-
-        ' validateScopes:=True catches root-provider + Scoped bugs at resolve time
-        Using sp = services.BuildServiceProvider(validateScopes:=True)
-            Application.Run(sp.GetRequiredService(Of MainForm)())
-        End Using
-    End Sub
-End Module
+Dim app = builder.Build()
 ```
 
 ---
 
-## Extension Method Pattern
+## 拡張メソッドパターン
 
-### Basic Structure
+### 基本構造
 
-Extension methods on `IServiceCollection` live in a `Module`, marked with `<Extension()>`:
-
-```vb
+```vbnet
 Imports System.Runtime.CompilerServices
 Imports Microsoft.Extensions.DependencyInjection
 
-Namespace MyApp.Customers
+Namespace MyApp.Users
 
-    Public Module CustomerServiceCollectionExtensions
-
-        <Extension()>
-        Public Function AddCustomerServices(services As IServiceCollection) As IServiceCollection
-            services.AddScoped(Of ICustomerRepository, CustomerRepository)()
-            services.AddScoped(Of ICustomerReadStore, CustomerReadStore)()
-            services.AddScoped(Of ICustomerWriteStore, CustomerWriteStore)()
-            services.AddScoped(Of ICustomerService, CustomerService)()
-            services.AddScoped(Of ICustomerValidationService, CustomerValidationService)()
+    Public Module UserServiceCollectionExtensions
+        <Extension>
+        Public Function AddUserServices(services As IServiceCollection) As IServiceCollection
+            services.AddScoped(Of IUserRepository, UserRepository)()
+            services.AddScoped(Of IUserReadStore, UserReadStore)()
+            services.AddScoped(Of IUserWriteStore, UserWriteStore)()
+            services.AddScoped(Of IUserService, UserService)()
+            services.AddScoped(Of IUserValidationService, UserValidationService)()
 
             Return services
         End Function
-
     End Module
 
 End Namespace
 ```
 
-### With Configuration
+### 設定パラメータあり
 
-```vb
+```vbnet
 Imports System.Runtime.CompilerServices
 Imports Microsoft.Extensions.DependencyInjection
-Imports Microsoft.Extensions.Options
 
 Namespace MyApp.Email
 
     Public Module EmailServiceCollectionExtensions
-
-        <Extension()>
+        <Extension>
         Public Function AddEmailServices(
-                services As IServiceCollection,
-                Optional configSectionName As String = "EmailSettings") As IServiceCollection
+            services As IServiceCollection,
+            Optional configSectionName As String = "EmailSettings") As IServiceCollection
 
-            services.AddOptions(Of EmailOptions)() _
+            services.AddOptionsWithValidateOnStart(Of EmailOptions)() _
                 .BindConfiguration(configSectionName) _
-                .ValidateDataAnnotations() _
-                .ValidateOnStart()
+                .ValidateDataAnnotations()
 
             services.AddSingleton(Of IMjmlTemplateRenderer, MjmlTemplateRenderer)()
             services.AddSingleton(Of IEmailLinkGenerator, EmailLinkGenerator)()
-            services.AddScoped(Of ICustomerEmailComposer, CustomerEmailComposer)()
+            services.AddScoped(Of IUserEmailComposer, UserEmailComposer)()
             services.AddScoped(Of IEmailSender, SmtpEmailSender)()
 
             Return services
         End Function
-
     End Module
 
 End Namespace
@@ -156,415 +117,242 @@ End Namespace
 
 ---
 
-## File Organization
+## ファイル構成
 
-Place extension methods near the services they register:
+拡張メソッドは、登録するサービスの近くに配置する。
 
 ```
 src/
-  MyApp.App/
-    Program.vb                            ' Composes all Add* methods
-    MainForm.vb                           ' Forms and presenters
-  MyApp.Customers/
+  MyApp.Api/
+    Program.vb                           # 全Add*メソッドを組み合わせる
+  MyApp.Users/
     Services/
-      CustomerService.vb
-    CustomerServiceCollectionExtensions.vb    ' AddCustomerServices()
+      UserService.vb
+    UserServiceCollectionExtensions.vb   # AddUserServices()
   MyApp.Orders/
-    OrderServiceCollectionExtensions.vb       ' AddOrderServices()
+    OrderServiceCollectionExtensions.vb  # AddOrderServices()
   MyApp.Email/
-    EmailServiceCollectionExtensions.vb       ' AddEmailServices()
+    EmailServiceCollectionExtensions.vb  # AddEmailServices()
 ```
 
-**Convention**: `{Feature}ServiceCollectionExtensions.vb` next to the feature's services.
+**命名規則**: `{Feature}ServiceCollectionExtensions.vb` をそのフィーチャーのサービスと同じ場所に置く。
 
 ---
 
-## Naming Conventions
+## 命名規則
 
-| Pattern | Use For |
+| パターン | 用途 |
 |---------|---------|
-| `Add{Feature}Services()` | General feature registration |
-| `Add{Feature}()` | Short form when unambiguous |
-| `Configure{Feature}()` | When primarily setting options |
-| `Add{Feature}Forms()` | When registering forms as DI services |
+| `Add{Feature}Services()` | 汎用フィーチャー登録 |
+| `Add{Feature}()` | 明確な場合の短縮形 |
+| `Configure{Feature}()` | 主にオプション設定を行う場合 |
+| `Use{Feature}()` | ミドルウェア（IApplicationBuilder用） |
 
 ---
 
-## Injecting Services into Forms
+## テストでの利点
 
-Forms participate in DI like any other service. Three steps:
+`Add*` パターンを使うと**本番の設定をテストで再利用**でき、差異のある部分だけ上書きできる。WebApplicationFactory、Akka.Hosting.TestKit、スタンドアロンのServiceCollectionと組み合わせて使用できる。完全なテスト例については[advanced-patterns.md](advanced-patterns.md)の該当セクションを参照。
 
-1. Register the form itself (usually `Transient` so each `Show()`/`ShowDialog()` gets a fresh instance).
-2. Have the form accept its dependencies via constructor.
-3. Resolve the root form (`MainForm`) from the provider and pass it to `Application.Run`.
+---
 
-```vb
-' Step 1 — register the form
+## 階層的拡張メソッド
+
+大規模なアプリケーションでは、拡張メソッドを階層的に組み合わせる。
+
+```vbnet
+Imports Microsoft.Extensions.DependencyInjection
 Imports System.Runtime.CompilerServices
-Imports Microsoft.Extensions.DependencyInjection
-
-Public Module FormServiceCollectionExtensions
-
-    <Extension()>
-    Public Function AddForms(services As IServiceCollection) As IServiceCollection
-        services.AddTransient(Of MainForm)()
-        services.AddTransient(Of CustomerEditForm)()
-        Return services
-    End Function
-
-End Module
-```
-
-```vb
-' Step 2 — constructor injection on the Form
-Public Class MainForm
-    Inherits Form
-
-    Private ReadOnly _customerService As ICustomerService
-    Private ReadOnly _logger As ILogger(Of MainForm)
-
-    Public Sub New(customerService As ICustomerService, logger As ILogger(Of MainForm))
-        _customerService = customerService
-        _logger = logger
-        InitializeComponent()
-    End Sub
-
-End Class
-```
-
-```vb
-' Step 3 — bootstrap in Program.vb
-Imports Microsoft.Extensions.DependencyInjection
-
-Module Program
-    <STAThread>
-    Sub Main()
-        Application.EnableVisualStyles()
-        Application.SetCompatibleTextRenderingDefault(False)
-
-        Dim services As New ServiceCollection()
-        services.AddCustomerServices()
-        services.AddForms()   ' registers MainForm as Transient (see Step 1)
-
-        Using sp = services.BuildServiceProvider(validateScopes:=True)
-            Application.Run(sp.GetRequiredService(Of MainForm)())
-        End Using
-    End Sub
-End Module
-```
-
-> **Warning — root provider + `Scoped` services:** Resolving a `Scoped` service from the root provider behaves as a de facto Singleton and fails when `validateScopes:=True` is set, so register long-lived services like `MainForm` as `Transient` or `Singleton` and use `IServiceScopeFactory` for per-operation scoped work (see below).
-
-### Opening child forms with DI
-
-Don't call `New CustomerEditForm(...)` directly — that bypasses DI. Inject a factory delegate (`Func(Of CustomerEditForm)`) or resolve through the provider:
-
-```vb
-Public Class MainForm
-    Inherits Form
-
-    Private ReadOnly _editFormFactory As Func(Of CustomerEditForm)
-
-    Public Sub New(editFormFactory As Func(Of CustomerEditForm))
-        _editFormFactory = editFormFactory
-        InitializeComponent()
-    End Sub
-
-    Private Sub btnEdit_Click(sender As Object, e As EventArgs) Handles btnEdit.Click
-        Using dlg = _editFormFactory()
-            dlg.ShowDialog(Me)
-        End Using
-    End Sub
-
-End Class
-```
-
-`Microsoft.Extensions.DependencyInjection` does NOT auto-provide `Func(Of T)` factories (unlike Autofac). Register the factory explicitly:
-
-```vb
-services.AddTransient(Of CustomerEditForm)()
-services.AddSingleton(Of Func(Of CustomerEditForm))(
-    Function(sp) Function() sp.GetRequiredService(Of CustomerEditForm)())
-```
-
-Then inject `Func(Of CustomerEditForm)` and call it to get a new instance from DI.
-
----
-
-## Lifetime Management
-
-| Lifetime | Use When | Examples (WinForms) |
-|----------|----------|---------------------|
-| **Singleton** | Stateless, thread-safe, expensive to create | Configuration, HTTP client factories, caches, `ILogger(Of T)` |
-| **Scoped** | Stateful per "unit of work" | `DbContext`, repositories tied to a single edit operation |
-| **Transient** | Lightweight, stateful, cheap to create | Validators, per-dialog Forms, short-lived helpers |
-
-```vb
-' SINGLETON: Stateless services, shared safely
-services.AddSingleton(Of IMjmlTemplateRenderer, MjmlTemplateRenderer)()
-
-' SCOPED: Database access, per-operation state
-services.AddScoped(Of ICustomerRepository, CustomerRepository)()
-
-' TRANSIENT: Cheap, short-lived, per-dialog
-services.AddTransient(Of CreateCustomerRequestValidator)()
-services.AddTransient(Of CustomerEditForm)()
-```
-
-**Scoped services require a scope.** ASP.NET Core creates one per HTTP request automatically; a WinForms app has no such automatic boundary. You must create scopes yourself (typically one per "operation" like opening a dialog or pressing Save).
-
-See [advanced-patterns.md](references/advanced-patterns.md) for the full scope-per-operation pattern.
-
----
-
-## Testing Benefits
-
-The `Add*` pattern lets you **reuse production configuration in tests** and only override what's different:
-
-```vb
-<TestClass>
-Public Class CustomerServiceTests
-
-    Private _provider As ServiceProvider
-
-    <TestInitialize>
-    Public Sub Setup()
-        Dim services As New ServiceCollection()
-
-        ' Reuse production registrations
-        services.AddCustomerServices()
-
-        ' Replace infrastructure with test doubles
-        services.RemoveAll(Of ICustomerRepository)()
-        services.AddSingleton(Of ICustomerRepository, InMemoryCustomerRepository)()
-
-        _provider = services.BuildServiceProvider(validateScopes:=True)
-    End Sub
-
-    <TestCleanup>
-    Public Sub Cleanup()
-        _provider.Dispose()
-    End Sub
-
-    <TestMethod>
-    Public Async Function CreateCustomer_ValidData_Succeeds() As Task
-        ' Create an explicit scope — ICustomerService is Scoped, so it
-        ' must not be resolved directly from the root provider.
-        Using scope = _provider.CreateScope()
-            Dim service = scope.ServiceProvider.GetRequiredService(Of ICustomerService)()
-            Dim result = Await service.CreateAsync(New CreateCustomerRequest("Alice"))
-
-            Assert.IsTrue(result.IsSuccess)
-        End Using
-    End Function
-
-End Class
-```
-
-See [advanced-patterns.md](references/advanced-patterns.md) for complete testing examples.
-
----
-
-## Layered Extensions
-
-For larger applications, compose extensions hierarchically:
-
-```vb
-Imports System.Runtime.CompilerServices
-Imports Microsoft.Extensions.DependencyInjection
 
 Public Module AppServiceCollectionExtensions
-
-    <Extension()>
+    <Extension>
     Public Function AddAppServices(services As IServiceCollection) As IServiceCollection
         Return services _
             .AddDomainServices() _
             .AddInfrastructureServices() _
-            .AddUiServices()
+            .AddApiServices()
     End Function
-
 End Module
 
 Public Module DomainServiceCollectionExtensions
-
-    <Extension()>
+    <Extension>
     Public Function AddDomainServices(services As IServiceCollection) As IServiceCollection
         Return services _
-            .AddCustomerServices() _
+            .AddUserServices() _
             .AddOrderServices() _
             .AddProductServices()
     End Function
-
 End Module
 ```
 
 ---
 
-## Generic Host Alternative
+## Akka.Hosting統合
 
-For apps that also need configuration loading, logging, or hosted services, use `Host.CreateDefaultBuilder()` to bootstrap instead of building the `ServiceProvider` by hand. This is the WinForms equivalent of ASP.NET Core's `WebApplication.CreateBuilder()`:
+同じパターンはAkka.NETアクター設定にも使用できる。
 
-```vb
-Imports Microsoft.Extensions.DependencyInjection
-Imports Microsoft.Extensions.Hosting
-
-Module Program
-    <STAThread>
-    Sub Main(args As String())
-        Application.EnableVisualStyles()
-        Application.SetCompatibleTextRenderingDefault(False)
-
-        Dim host = Host.CreateDefaultBuilder(args) _
-            .ConfigureServices(Sub(ctx, services)
-                                   services.AddCustomerServices()
-                                   services.AddForms()
-                               End Sub) _
-            .Build()
-
-        Using host
-            host.Start()
-            Application.Run(host.Services.GetRequiredService(Of MainForm)())
-            host.StopAsync().GetAwaiter().GetResult()
-        End Using
-    End Sub
+```vbnet
+Public Module OrderActorExtensions
+    <Extension>
+    Public Function AddOrderActors(builder As AkkaConfigurationBuilder) As AkkaConfigurationBuilder
+        Return builder _
+            .WithActors(Sub(system, registry, resolver)
+                Dim orderProps = resolver.Props(Of OrderActor)()
+                Dim orderRef = system.ActorOf(orderProps, "orders")
+                registry.Register(Of OrderActor)(orderRef)
+            End Sub)
+    End Function
 End Module
+
+' Program.vbでの使用例
+builder.Services.AddAkka("MySystem", Sub(akkaBuilder, sp)
+    akkaBuilder _
+        .AddOrderActors() _
+        .AddInventoryActors() _
+        .AddNotificationActors()
+End Sub)
 ```
 
-This gives you `appsettings.json` binding, `ILogger(Of T)` with proper providers, and `IHostedService` support for long-running background work — all consistent with the rest of the .NET ecosystem.
+完全なAkka.Hostingパターンは`akka-hosting-actor-patterns`スキルを参照。
 
 ---
 
-## Anti-Patterns
+## アンチパターン
 
-### Don't: Register Everything in Program.vb
+### NG：すべてをProgram.vbに登録する
 
-```vb
-' BAD: Massive Program.vb with 200+ lines of registrations
+```vbnet
+' BAD: 200行以上の登録コードが並ぶ肥大化したProgram.vb
 ```
 
-### Don't: Create Overly Generic Extensions
+### NG：過度に汎用的な拡張メソッドを作る
 
-```vb
-' BAD: Too vague, doesn't communicate what's registered
-<Extension()>
+```vbnet
+' BAD: 名前が曖昧で何が登録されるか伝わらない
+<Extension>
 Public Function AddServices(services As IServiceCollection) As IServiceCollection
     ' ...
-    Return services
 End Function
 ```
 
-### Don't: Hide Important Configuration
+### NG：重要な設定を隠蔽する
 
-```vb
-' BAD: Buried settings
-<Extension()>
+```vbnet
+' BAD: 設定が埋もれている
+<Extension>
 Public Function AddDatabase(services As IServiceCollection) As IServiceCollection
-    services.AddDbContext(Of AppDbContext)(
-        Sub(options) options.UseSqlServer("hardcoded-connection-string"))  ' Hidden!
+    services.AddDbContext(Of AppDbContext)(Sub(options)
+        options.UseSqlServer("hardcoded-connection-string")  ' 隠蔽！
+    End Sub)
     Return services
 End Function
 
-' GOOD: Accept configuration explicitly
-<Extension()>
-Public Function AddDatabase(services As IServiceCollection, connectionString As String) As IServiceCollection
-    services.AddDbContext(Of AppDbContext)(
-        Sub(options) options.UseSqlServer(connectionString))
+' GOOD: 設定を明示的に受け取る
+<Extension>
+Public Function AddDatabase(
+    services As IServiceCollection,
+    connectionString As String) As IServiceCollection
+
+    services.AddDbContext(Of AppDbContext)(Sub(options)
+        options.UseSqlServer(connectionString)
+    End Sub)
     Return services
 End Function
-```
-
-### Don't: `New MyForm()` When MyForm Is Registered
-
-```vb
-' BAD: Bypasses DI — dependencies won't be resolved
-Dim dlg As New CustomerEditForm()
-dlg.ShowDialog()
-
-' GOOD: Resolve through a factory or the provider
-Using dlg = _editFormFactory()
-    dlg.ShowDialog(Me)
-End Using
 ```
 
 ---
 
-## Best Practices Summary
+## ベストプラクティス一覧
 
-| Practice | Benefit |
+| プラクティス | 効果 |
 |----------|---------|
-| Group related services into `Add*` methods | Clean Program.vb, clear boundaries |
-| Place extensions near the services they register | Easy to find and maintain |
-| Return `IServiceCollection` for chaining | Fluent API |
-| Accept configuration parameters | Flexibility |
-| Use consistent naming (`Add{Feature}Services`) | Discoverability |
-| Inject forms via constructor, register them in DI | Testable, swappable |
-| Use `Func(Of TForm)` factories for child dialogs | Respect DI lifetimes |
-| Test by reusing production extensions | Confidence, less duplication |
+| 関連サービスを`Add*`メソッドにグループ化する | Program.vbをクリーンに保ち、境界を明確にする |
+| 拡張メソッドを登録するサービスの近くに置く | 見つけやすく保守しやすい |
+| `IServiceCollection`を返してチェーン可能にする | FluentなAPI |
+| 設定パラメータを受け取る | 柔軟性の確保 |
+| 命名規則を統一する（`Add{Feature}Services`） | 発見しやすさの向上 |
+| テストで本番の拡張メソッドを再利用する | 信頼性向上、重複削減 |
 
 ---
 
-## Common Mistakes
+## ライフタイム管理
 
-### Injecting Scoped into Singleton
+| ライフタイム | 使用場面 | 例 |
+|----------|----------|----------|
+| **シングルトン（Singleton）** | ステートレス、スレッドセーフ、生成コストが高い | 設定、HttpClientファクトリ、キャッシュ |
+| **スコープ（Scoped）** | リクエストごとのステート、データベースコンテキスト | DbContext、リポジトリ、ユーザーコンテキスト |
+| **一時（Transient）** | 軽量、ステートフル、生成コストが低い | バリデータ、短命ヘルパー |
 
-```vb
-' BAD: Singleton captures scoped service — stale DbContext!
-Public Class CacheService   ' Registered as Singleton
-    Private ReadOnly _repo As ICustomerRepository  ' Scoped — captured at startup!
+```vbnet
+' SINGLETON: ステートレスサービス、安全に共有
+services.AddSingleton(Of IMjmlTemplateRenderer, MjmlTemplateRenderer)()
 
-    Public Sub New(repo As ICustomerRepository)
-        _repo = repo
-    End Sub
+' SCOPED: データベースアクセス、リクエストごとのステート
+services.AddScoped(Of IUserRepository, UserRepository)()
+
+' TRANSIENT: 安価で短命
+services.AddTransient(Of CreateUserRequestValidator)()
+```
+
+**スコープサービスはスコープを必要とする。** ASP.NET CoreはHTTPリクエストごとにスコープを作成する。バックグラウンドサービスやアクター内では手動でスコープを作成する必要がある。
+
+アクタースコープ管理パターンは[advanced-patterns.md](advanced-patterns.md)を参照。
+
+---
+
+## よくある間違い
+
+### スコープサービスをシングルトンに注入する
+
+```vbnet
+' BAD: シングルトンがスコープサービスをキャプチャ — 古くなったDbContext！
+Public Class CacheService  ' シングルトンとして登録
+    Private ReadOnly _repo As IUserRepository  ' スコープ — 起動時にキャプチャされる！
 End Class
 
-' GOOD: Inject IServiceScopeFactory, create a scope per operation
+' GOOD: IServiceProviderを注入し、操作ごとにスコープを作成する
 Public Class CacheService
-    Private ReadOnly _scopeFactory As IServiceScopeFactory
+    Private ReadOnly _serviceProvider As IServiceProvider
 
-    Public Sub New(scopeFactory As IServiceScopeFactory)
-        _scopeFactory = scopeFactory
-    End Sub
-
-    Public Async Function GetCustomerAsync(id As String) As Task(Of Customer)
-        Using scope = _scopeFactory.CreateScope()
-            Dim repo = scope.ServiceProvider.GetRequiredService(Of ICustomerRepository)()
+    Public Async Function GetUserAsync(id As String) As Task(Of User)
+        Using scope = _serviceProvider.CreateScope()
+            Dim repo = scope.ServiceProvider.GetRequiredService(Of IUserRepository)()
             Return Await repo.GetByIdAsync(id)
         End Using
     End Function
 End Class
 ```
 
-### Holding a Scoped Service for the Life of a Form
+### バックグラウンド処理でスコープを作成しない
 
-A `MainForm` that lives for the whole session should **not** inject `DbContext` (scoped) directly — the context will be kept alive forever, accumulate tracked entities, and eventually throw. Instead, inject `IServiceScopeFactory` and create a fresh scope for each operation:
+```vbnet
+' BAD: スコープサービスにスコープなし
+Public Class BadBackgroundService
+    Inherits BackgroundService
 
-```vb
-Public Class MainForm
-    Inherits Form
+    Private ReadOnly _orderService As IOrderService  ' スコープ — 例外が発生する！
+End Class
+
+' GOOD: 処理単位ごとにスコープを作成する
+Public Class GoodBackgroundService
+    Inherits BackgroundService
 
     Private ReadOnly _scopeFactory As IServiceScopeFactory
 
-    Public Sub New(scopeFactory As IServiceScopeFactory)
-        _scopeFactory = scopeFactory
-        InitializeComponent()
-    End Sub
-
-    Private Async Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnSave.Click
+    Protected Overrides Async Function ExecuteAsync(ct As CancellationToken) As Task
         Using scope = _scopeFactory.CreateScope()
-            Dim service = scope.ServiceProvider.GetRequiredService(Of ICustomerService)()
-            Await service.SaveAsync(txtName.Text)
+            Dim orderService = scope.ServiceProvider.GetRequiredService(Of IOrderService)()
+            ' ...
         End Using
-    End Sub
-
+    End Function
 End Class
 ```
 
-See [advanced-patterns.md](references/advanced-patterns.md) for a deeper treatment of scope-per-operation in WinForms.
-
 ---
 
-## Resources
+## リソース
 
 - **Microsoft.Extensions.DependencyInjection**: https://learn.microsoft.com/en-us/dotnet/core/extensions/dependency-injection
-- **Generic Host for desktop apps**: https://learn.microsoft.com/en-us/dotnet/core/extensions/generic-host
-- **Options Pattern**: See related options/configuration skills
+- **Akka.Hosting**: https://github.com/akkadotnet/Akka.Hosting
+- **Akka.DependencyInjection**: https://getakka.net/articles/actors/dependency-injection.html
+- **オプションパターン**: `microsoft-extensions-configuration`スキルを参照

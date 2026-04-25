@@ -50,4 +50,4 @@ MIT License — [LICENSE](LICENSE) 参照。
 - [managedcode/dotnet-skills](https://github.com/managedcode/dotnet-skills) — `dotnet-winforms`, `dotnet-project-setup` の原版
 - dotnet-skills 公式プラグイン — `modern-csharp-coding-standards`, `csharp-concurrency-patterns`, `dependency-injection-patterns` の原版
 
-変換には [skill-conversion](https://github.com/oreguchi/skill-conversion) プラグイン（`skill-conversion` v0.2.0）を使用。変換の全履歴・ドリフトレポート・承認追加レジスタは作者ローカルに保管（公開リポジトリには成果物のみを収録）。
+変換には [skill-conversion](https://github.com/oreguchi/skill-conversion) プラグイン（`skill-conversion` v0.2.0）を使用。変換の全履歴と判断は `docs/plans/2026-04-23-vb-winforms-skills-conversion/` を参照。

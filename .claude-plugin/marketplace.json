@@ -8,7 +8,7 @@
     {
       "name": "vb-winforms-skills",
       "source": "./",
-      "description": "VB.NET/.NET 向け Claude Code スキル集 (2.0.0)。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理、DI パターンを 5 つのスキルで提供。"
+      "description": "VB.NET/.NET 向け Claude Code スキル集 (2.1.0)。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理、DI パターンを 5 つのスキルで提供。v2.1 で WinForms 特化章（UI スレッドマーシャリング、フォーム注入、IProgress）を追加統合。"
     }
   ]
 }

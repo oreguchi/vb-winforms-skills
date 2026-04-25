@@ -49,6 +49,15 @@ invocable: false
 ├─► プロデューサー/コンシューマーパターン（ワークキュー）?
 │   └─► System.Threading.Channels を使う
 │
+├─► バックグラウンド処理から Form に進捗を報告する?
+│   └─► IProgress(Of T) + Progress(Of T) を使う
+│
+├─► キャンセルボタンで実行中の操作をキャンセルする?
+│   └─► Cancel ボタンに紐付けた CancellationTokenSource を使う
+│
+├─► 非 UI スレッドから UI を更新する（タイマー、ワーカースレッド、シリアルコールバック）?
+│   └─► Control.Invoke / Control.BeginInvoke（または SynchronizationContext）を使う
+│
 ├─► UIイベント処理（デバウンス、スロットル、結合）?
 │   └─► Reactive Extensions (Rx) を使う
 │
@@ -182,6 +191,170 @@ End Class
 
 ---
 
+## WinForms 特化: UI スレッドマーシャリングと進捗報告
+
+<!-- v2.1.0: 1.0.0 からの WinForms 特化章取り込み -->
+
+### UI スレッドマーシャリング
+
+Windows Forms は単一 UI スレッドを前提にしている。UI スレッド以外から UI コントロールを操作すると `InvalidOperationException`（「Cross-thread operation not valid」）が発生する。
+
+**Async/Await の場合は自動**: フォームのイベントハンドラから `Await` を使うと、WinForms の `SynchronizationContext` が継続を UI スレッドに戻す。
+
+```vbnet
+' フォームのイベントハンドラ内 — UI スレッドで実行
+Private Async Sub btnLoad_Click(sender As Object, e As EventArgs) Handles btnLoad.Click
+    btnLoad.Enabled = False
+    Try
+        ' Await が UI SynchronizationContext をキャプチャする
+        ' タスク完了後、継続は UI スレッドで実行される
+        Dim data = Await _service.LoadAsync()
+        lblResult.Text = data.Summary   ' 安全: UI スレッド上
+    Finally
+        btnLoad.Enabled = True
+    End Try
+End Sub
+```
+
+**Async/Await 外のスレッドから更新する場合**（タイマーコールバック、シリアルポートの `DataReceived` イベント、SPEL+ イベントコールバックなど）は明示的なマーシャリングが必要。
+
+```vbnet
+' 非 UI スレッド（タイマー、シリアルポートなど）から呼ばれる
+Private Sub OnSensorReading(value As Double)
+    If lblSensor.InvokeRequired Then
+        lblSensor.BeginInvoke(Sub() lblSensor.Text = value.ToString("F3"))
+    Else
+        lblSensor.Text = value.ToString("F3")
+    End If
+End Sub
+```
+
+- `Control.Invoke` — 同期。UI が処理を完了するまで呼び出し元をブロックする。
+- `Control.BeginInvoke` — 非同期（ファイア・アンド・フォーゲット）。高頻度更新（センサーストリーム、ログメッセージ）に推奨。
+- `SynchronizationContext.Current` — UI スレッドでキャプチャしておき、`Control` 参照を持たないワーカーコードから `.Post`（非同期）または `.Send`（同期）で呼び出す。
+
+**ライブラリコードと `ConfigureAwait(False)`**: フォームのコードでは `ConfigureAwait(False)` を付けない。フォームから呼ばれるクラスライブラリでは、特定の SynchronizationContext に依存しないよう `ConfigureAwait(False)` を付ける。
+
+```vbnet
+' ライブラリコード
+Public Async Function LoadAsync() As Task(Of Data)
+    Dim json = Await _http.GetStringAsync(_url).ConfigureAwait(False)
+    Return JsonSerializer.Deserialize(Of Data)(json)
+End Function
+```
+
+### IProgress(Of T) による進捗報告
+
+`IProgress(Of T)` はバックグラウンド処理からフォームへの進捗報告の標準パターンである。`Progress(Of T)` は UI スレッドで作成すると UI `SynchronizationContext` をキャプチャするため、コールバックが自動的に UI スレッドで実行される。手動の `Invoke` は不要。
+
+```vbnet
+' サービス側: IProgress(Of T) を受け取る
+Public Async Function ProcessFilesAsync(
+    files As IReadOnlyList(Of String),
+    progress As IProgress(Of Integer),
+    ct As CancellationToken) As Task
+
+    For i = 0 To files.Count - 1
+        ct.ThrowIfCancellationRequested()
+        Await ProcessOneAsync(files(i), ct).ConfigureAwait(False)
+        progress?.Report(CInt((i + 1) / files.Count * 100))
+    Next
+End Function
+
+' フォーム側: UI スレッドで Progress(Of T) を作成する
+Private Async Sub btnStart_Click(sender As Object, e As EventArgs) Handles btnStart.Click
+    Dim reporter As IProgress(Of Integer) = New Progress(Of Integer)(
+        Sub(pct)
+            ' UI スレッドで実行される。コントロールに安全にアクセスできる
+            progressBar1.Value = pct
+            lblPercent.Text = $"{pct}%"
+        End Sub)
+
+    Await _service.ProcessFilesAsync(_files, reporter, CancellationToken.None)
+End Sub
+```
+
+**複合的な進捗状態**（パーセント＋メッセージ＋推定完了時間など）は `Class` か `Structure` パラメータで報告する。
+
+### キャンセルボタンとの連携
+
+`CancellationTokenSource` を Cancel ボタンに紐付け、フォームを閉じる際も確実に Dispose する。
+
+```vbnet
+Public Partial Class ImportForm
+    Inherits Form
+
+    Private _cts As CancellationTokenSource
+
+    Private Async Sub btnStart_Click(sender As Object, e As EventArgs) Handles btnStart.Click
+        _cts = New CancellationTokenSource()
+        btnStart.Enabled = False
+        btnCancel.Enabled = True
+        Try
+            Await _service.ImportAsync(_cts.Token)
+            lblStatus.Text = "完了。"
+        Catch ex As OperationCanceledException
+            lblStatus.Text = "キャンセルされました。"
+        Catch ex As Exception
+            lblStatus.Text = $"エラー: {ex.Message}"
+        Finally
+            btnStart.Enabled = True
+            btnCancel.Enabled = False
+            _cts?.Dispose()
+            _cts = Nothing
+        End Try
+    End Sub
+
+    Private Sub btnCancel_Click(sender As Object, e As EventArgs) Handles btnCancel.Click
+        _cts?.Cancel()
+    End Sub
+
+    Private Sub ImportForm_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
+        ' フォームを閉じる際もキャンセルして Dispose する
+        _cts?.Cancel()
+        _cts?.Dispose()
+    End Sub
+End Class
+```
+
+サービス側でトークンを確認する。
+
+```vbnet
+Public Async Function ImportAsync(ct As CancellationToken) As Task
+    For Each row In _rows
+        ct.ThrowIfCancellationRequested()
+        Await _db.InsertAsync(row, ct).ConfigureAwait(False)
+    Next
+End Function
+```
+
+### Async Sub — イベントハンドラにのみ使用する
+
+`Async Sub`（C# の `async void` に相当）は `Task` を返さないため、呼び出し元は `Await` できず、未処理の例外はプロセスをクラッシュさせる。`Async Sub` は WinForms のイベントハンドラにのみ使用し、それ以外は `Task` または `Task(Of T)` を返す。
+
+```vbnet
+' OK: イベントハンドラ
+Private Async Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnSave.Click
+    Try
+        Await SaveAsync()
+    Catch ex As Exception
+        MessageBox.Show(ex.Message)
+    End Try
+End Sub
+
+' NG: 汎用メソッドとしての Async Sub（例外発生時にアプリがクラッシュする）
+Public Async Sub StartBackgroundWork()
+    Await DoWorkAsync()
+End Sub
+
+' 良い例: Task を返す
+Public Async Function StartBackgroundWorkAsync() As Task
+    Await DoWorkAsync()
+End Function
+```
+
+---
+
 ## レベル 4+: Akka.NET Streams、Reactive Extensions、アクター
 
 ストリーム処理、UI イベント合成、ステートフルなエンティティ管理などの高度なシナリオは [advanced-concurrency.md](advanced-concurrency.md) を参照する。
@@ -255,6 +428,9 @@ Dim results As New ConcurrentBag(Of Result)()
 | I/O 待機 | `Async`/`Await` | HTTP 呼び出し、データベースクエリ |
 | CPU バウンドの並列処理 | `Parallel.ForEachAsync` | 画像処理、計算 |
 | ワークキュー | `Channel(Of T)` | バックグラウンドジョブ処理 |
+| バックグラウンドから UI に進捗を報告 | `IProgress(Of T)` + `Progress(Of T)` | インポート/エクスポートのプログレスバー |
+| ユーザーが実行中の操作をキャンセル | `CancellationTokenSource` + Cancel ボタン | 長時間インポート、ネットワーク呼び出し |
+| ワーカースレッドから UI スレッドへのマーシャリング | `Control.Invoke` / `BeginInvoke` | シリアルポート `DataReceived`、タイマーコールバック |
 | デバウンス/スロットルを伴う UI イベント | Reactive Extensions | 検索候補表示、自動保存 |
 | サーバーサイドのバッチ/スロットル | Akka.NET Streams | イベント集約、レート制限 |
 | ステートマシン | Akka.NET アクター | 支払いフロー、注文ライフサイクル |
@@ -269,6 +445,10 @@ Dim results As New ConcurrentBag(Of Result)()
 
 ```
 Async/Await（ここから始める）
+    │
+    ├─► 進捗報告が必要? → IProgress(Of T)
+    │
+    ├─► キャンセルが必要? → CancellationTokenSource + Cancel ボタン
     │
     ├─► 並列処理が必要? → Parallel.ForEachAsync
     │

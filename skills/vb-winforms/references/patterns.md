@@ -588,18 +588,184 @@ Public Class CustomerSavedEventArgs
 End Class
 ```
 
+### DI によるフォーム解決とフォーム間データ受け渡し
+
+<!-- v2.1.0: 1.0.0 からの WinForms 特化章取り込み -->
+
+`ServiceProvider` を直接参照してフォームを生成すると DI コンテナへの依存が散らばるため、`IServiceProvider` をルートフォームにのみ注入し、子フォームはファクトリーまたは `IServiceProvider.GetRequiredService` で解決する。
+
+```vbnet
+' Program.vb — DI 登録の全体像
+Module Program
+    <STAThread>
+    Sub Main()
+        ApplicationConfiguration.Initialize()
+
+        Dim services As New ServiceCollection()
+
+        ' サービス登録
+        services.AddSingleton(Of ICustomerService, CustomerService)()
+        services.AddSingleton(Of IFormMediator, FormMediator)()
+
+        ' フォーム登録: メインフォームは Singleton、子フォームは Transient
+        services.AddSingleton(Of MainForm)()
+        services.AddTransient(Of CustomerEditorForm)()
+        services.AddTransient(Of OrderListForm)()
+
+        Using sp = services.BuildServiceProvider()
+            Application.Run(sp.GetRequiredService(Of MainForm)())
+        End Using
+    End Sub
+End Module
+
+' メインフォーム: IServiceProvider を受け取り子フォームを解決する
+Public Partial Class MainForm
+    Inherits Form
+
+    Private ReadOnly _sp As IServiceProvider
+
+    Public Sub New(sp As IServiceProvider)
+        InitializeComponent()
+        _sp = sp
+    End Sub
+
+    Private Sub btnOpenEditor_Click(sender As Object, e As EventArgs) Handles btnOpenEditor.Click
+        ' Transient なので呼ぶたびに新しいインスタンスが作られる
+        Using editor = _sp.GetRequiredService(Of CustomerEditorForm)()
+            If editor.ShowDialog(Me) = DialogResult.OK Then
+                RefreshList()
+            End If
+        End Using
+    End Sub
+End Class
+```
+
+**子フォームへのデータ受け渡し**: DI で解決したフォームにデータを渡すには、専用のメソッド（`Initialize`）かプロパティで設定する。コンストラクタ引数として渡すと DI の Transient 登録と競合するため避ける。
+
+```vbnet
+' 子フォーム: Initialize メソッドでデータを受け取る
+Public Partial Class CustomerEditorForm
+    Inherits Form
+
+    Private ReadOnly _customerService As ICustomerService
+    Private _customer As Customer
+
+    ' DI コンテナからはこのコンストラクタが使われる
+    Public Sub New(customerService As ICustomerService)
+        InitializeComponent()
+        _customerService = customerService
+    End Sub
+
+    ' フォームを開く前に呼び出してデータを設定する
+    Public Sub Initialize(customer As Customer)
+        _customer = customer
+        BindFormToCustomer()
+    End Sub
+
+    Private Sub BindFormToCustomer()
+        If _customer IsNot Nothing Then
+            txtName.Text = _customer.Name
+            txtEmail.Text = _customer.Email
+        End If
+    End Sub
+
+    Private Async Sub btnSave_Click(sender As Object, e As EventArgs) Handles btnSave.Click
+        If ValidateChildren() Then
+            _customer.Name = txtName.Text
+            _customer.Email = txtEmail.Text
+            Await _customerService.SaveAsync(_customer)
+            DialogResult = DialogResult.OK
+            Close()
+        End If
+    End Sub
+End Class
+
+' 呼び出し側: 解決 → Initialize → ShowDialog の順
+Private Sub OpenEditorForCustomer(customer As Customer)
+    Using editor = _sp.GetRequiredService(Of CustomerEditorForm)()
+        editor.Initialize(customer)
+        If editor.ShowDialog(Me) = DialogResult.OK Then
+            RefreshList()
+        End If
+    End Using
+End Sub
+```
+
+**モーダルフォームとファクトリーパターン**: フォームの生成ロジックが複雑な場合は `Func(Of TForm)` をファクトリーとして登録すると、`IServiceProvider` をフォームに渡さずに済む。
+
+```vbnet
+' DI 登録: Func(Of CustomerEditorForm) をファクトリーとして登録
+services.AddTransient(Of CustomerEditorForm)()
+services.AddSingleton(Of Func(Of CustomerEditorForm))(
+    Function(sp) Function() sp.GetRequiredService(Of CustomerEditorForm)())
+
+' メインフォーム: IServiceProvider の代わりにファクトリーを注入する
+Public Partial Class MainForm
+    Inherits Form
+
+    Private ReadOnly _editorFactory As Func(Of CustomerEditorForm)
+
+    Public Sub New(editorFactory As Func(Of CustomerEditorForm))
+        InitializeComponent()
+        _editorFactory = editorFactory
+    End Sub
+
+    Private Sub OpenEditor(customer As Customer)
+        Using editor = _editorFactory()
+            editor.Initialize(customer)
+            editor.ShowDialog(Me)
+        End Using
+    End Sub
+End Class
+```
+
 ## スレッド処理パターン
 
+<!-- v2.1.0: 1.0.0 からの WinForms 特化章取り込み -->
+
 ### 安全な UI 更新
+
+Windows Forms は単一 UI スレッドを前提にしている。UI スレッド以外のスレッドから UI コントロールを操作すると `InvalidOperationException`（「Cross-thread operation not valid」）が発生する。
+
+**Async/Await を使っている場合**: フォームのイベントハンドラから `Await` を呼び出すと、WinForms の `SynchronizationContext` が自動的に継続を UI スレッドに戻す。`ConfigureAwait(False)` を付けない限り、`Await` の後は UI スレッド上にある。
+
+```vbnet
+' フォームのイベントハンドラ — Await 後も UI スレッド上に戻る
+Private Async Sub btnLoad_Click(sender As Object, e As EventArgs) Handles btnLoad.Click
+    btnLoad.Enabled = False
+    Try
+        ' UI SynchronizationContext をキャプチャする
+        ' タスク完了後、継続は UI スレッドで実行される
+        Dim data = Await _service.LoadAsync()
+        lblResult.Text = data.Summary   ' 安全: UI スレッド上
+    Finally
+        btnLoad.Enabled = True
+    End Try
+End Sub
+```
+
+**Async/Await を使っていない場合**（タイマーコールバック、シリアルポートイベント、バックグラウンドスレッドなど）は、明示的にマーシャリングが必要。
 
 ```vbnet
 Public Partial Class DataForm
     Inherits Form
 
-    Private ReadOnly _syncContext As SynchronizationContext
+    Private _syncContext As SynchronizationContext
 
     Public Sub New()
         InitializeComponent()
+        ' 注意: コンストラクタでは SynchronizationContext.Current を
+        ' キャプチャしない。この時点ではハンドルが作成されておらず、
+        ' Application.Run が WindowsFormsSynchronizationContext を
+        ' インストールする前のため、Current が Nothing または
+        ' 誤ったコンテキストになる可能性がある。
+        ' OnHandleCreated でキャプチャする。
+    End Sub
+
+    Protected Overrides Sub OnHandleCreated(e As EventArgs)
+        MyBase.OnHandleCreated(e)
+        ' ここでキャプチャするのが安全: UI スレッド上でフォームの
+        ' ハンドルが存在し、WinForms の SynchronizationContext がインストール済み
         _syncContext = SynchronizationContext.Current
     End Sub
 
@@ -607,21 +773,33 @@ Public Partial Class DataForm
         ' バックグラウンド処理を開始する
         Dim data = Await Task.Run(Function() LoadExpensiveData())
 
-        ' await により WinForms コンテキストでは既に UI スレッド上にある
+        ' ConfigureAwait(False) を付けていないため、
+        ' 継続は WinForms コンテキスト（UI スレッド）で実行される
         dgvData.DataSource = data
     End Function
 
-    ' ファイアアンドフォーゲットまたは手動スレッドの場合
+    ' タイマーやシリアルポートなど非 UI スレッドから呼ばれる場合
+    Private Sub OnSensorReading(value As Double)
+        If lblSensor.InvokeRequired Then
+            ' BeginInvoke: 非同期（呼び出し元スレッドをブロックしない）
+            ' 高頻度更新（センサーストリーム、ログ）に推奨
+            lblSensor.BeginInvoke(Sub() lblSensor.Text = value.ToString("F3"))
+        Else
+            lblSensor.Text = value.ToString("F3")
+        End If
+    End Sub
+
+    ' SynchronizationContext 経由（Control 参照を持たないコードから）
     Private Sub StartBackgroundWork()
         Task.Run(Sub()
             Dim result = DoWork()
-
-            ' UI スレッドに戻す
+            ' Post: 非同期（BeginInvoke と同等）
+            ' Send: 同期（Invoke と同等、UI スレッドをブロックするため注意）
             _syncContext.Post(Sub(state) lblResult.Text = result, Nothing)
         End Sub)
     End Sub
 
-    ' InvokeRequired アプローチ
+    ' InvokeRequired による再帰パターン
     Private Sub UpdateStatusSafe(status As String)
         If InvokeRequired Then
             Invoke(Sub() UpdateStatusSafe(status))
@@ -630,6 +808,107 @@ Public Partial Class DataForm
         lblStatus.Text = status
     End Sub
 End Class
+```
+
+**使い分けの目安:**
+
+| 手段 | 動作 | 推奨場面 |
+|------|------|----------|
+| `Control.Invoke` | 同期（UI スレッドの完了を待つ） | 呼び出し元が UI 更新の完了を確認する必要がある場合 |
+| `Control.BeginInvoke` | 非同期（呼び出し元をブロックしない） | 高頻度更新（センサー、ログ）など |
+| `SynchronizationContext.Post` | 非同期（`BeginInvoke` と同等） | `Control` 参照を持たないライブラリコード |
+| `SynchronizationContext.Send` | 同期（`Invoke` と同等） | 同期が必須の場合（デッドロックに注意） |
+
+**ライブラリコードでの `ConfigureAwait(False)`:**
+
+フォームのコードでは `ConfigureAwait(False)` を付けない（UI スレッドに戻る必要があるため）。フォームから呼ばれるクラスライブラリでは、特定の SynchronizationContext に依存しないよう `ConfigureAwait(False)` を付ける。
+
+```vbnet
+' ライブラリコード: ConfigureAwait(False) を付けて呼び出し元の
+' コンテキストに依存しないようにする
+Public Async Function LoadAsync() As Task(Of Data)
+    Dim json = Await _http.GetStringAsync(_url).ConfigureAwait(False)
+    Return JsonSerializer.Deserialize(Of Data)(json)
+End Function
+```
+
+### IProgress(Of T) による進捗報告
+
+`IProgress(Of T)` はバックグラウンド処理からフォームへの進捗報告の標準的な手段である。`Progress(Of T)` は UI スレッド上でコンストラクトされると UI SynchronizationContext をキャプチャするため、コールバックは自動的に UI スレッドで実行される。手動の `Invoke` は不要。
+
+```vbnet
+' サービス側: IProgress(Of T) を受け取る（ライブラリとして設計）
+Public Async Function ProcessFilesAsync(
+    files As IReadOnlyList(Of String),
+    progress As IProgress(Of Integer),
+    ct As CancellationToken) As Task
+
+    For i = 0 To files.Count - 1
+        ct.ThrowIfCancellationRequested()
+        Await ProcessOneAsync(files(i), ct).ConfigureAwait(False)
+        progress?.Report(CInt((i + 1) / files.Count * 100))
+    Next
+End Function
+
+' フォーム側: UI スレッドで Progress(Of T) を作成する
+Private Async Sub btnStart_Click(sender As Object, e As EventArgs) Handles btnStart.Click
+    Dim reporter As IProgress(Of Integer) = New Progress(Of Integer)(
+        Sub(pct)
+            ' UI スレッドで実行される。コントロールに安全にアクセスできる
+            progressBar1.Value = pct
+            lblPercent.Text = $"{pct}%"
+        End Sub)
+
+    Await _service.ProcessFilesAsync(_files, reporter, CancellationToken.None)
+End Sub
+```
+
+**複合的な進捗状態**（パーセント＋メッセージ＋推定完了時間など）を報告する場合は、スカラー `Integer` の代わりに専用の `Class` または `Structure` パラメータを使う。
+
+```vbnet
+Public Class ProgressInfo
+    Public ReadOnly Property Percent As Integer
+    Public ReadOnly Property Message As String
+    Public Sub New(percent As Integer, message As String)
+        Me.Percent = percent
+        Me.Message = message
+    End Sub
+End Class
+
+' サービス側
+progress?.Report(New ProgressInfo(pct, $"処理中: {fileName}"))
+
+' フォーム側
+Dim reporter As IProgress(Of ProgressInfo) = New Progress(Of ProgressInfo)(
+    Sub(info)
+        progressBar1.Value = info.Percent
+        lblStatus.Text = info.Message
+    End Sub)
+```
+
+**`Application.DoEvents` を使わない:** レガシーコードでよく見られる `Application.DoEvents()` による UI 更新は再帰的なメッセージポンプを引き起こし、バグの原因になる。`Async/Await` + `IProgress(Of T)` + `CancellationToken` の組み合わせに置き換える。
+
+```vbnet
+' 悪い例: Application.DoEvents — 再帰的メッセージポンプ、状態が半壊したまま
+' ボタンクリックなどが中途半端なタイミングで発火し得る
+For i = 0 To 10000
+    Process(i)
+    Application.DoEvents()
+Next
+
+' 良い例: Task.Run + IProgress(Of T) + CancellationToken
+Private Async Sub btnProcess_Click(sender As Object, e As EventArgs) Handles btnProcess.Click
+    Dim progress As IProgress(Of Integer) = New Progress(Of Integer)(
+        Sub(pct) progressBar1.Value = pct)
+
+    Await Task.Run(
+        Sub()
+            For i = 0 To 10000
+                Process(i)
+                progress.Report(CInt(i / 10000.0 * 100))
+            Next
+        End Sub)
+End Sub
 ```
 
 ### キャンセルパターン

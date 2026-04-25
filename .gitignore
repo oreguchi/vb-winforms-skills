@@ -4,7 +4,7 @@
 **/*.user
 **/.vs/
 
-# sample-build runtime outputs (ビルド成果物のみ除外、ソースは保持)
+# sample-build runtime outputs
 **/sample-build/**/bin/
 **/sample-build/**/obj/
 **/sample-build/**/artifacts/
@@ -18,5 +18,5 @@ desktop.ini
 *.swp
 *.swo
 
-# Local Claude Code session data (もし混入したら除外)
+# Local Claude Code session data
 .claude/

@@ -99,6 +99,24 @@ Namespace MyApp.Email
             services As IServiceCollection,
             Optional configSectionName As String = "EmailSettings") As IServiceCollection
 
+            ' VB.NET における OptionsBuilder の起動時検証
+            ' ---
+            ' 単純な ASP.NET Core / Hosting 環境では、以下の従来チェーンで動作する：
+            '
+            '   services.AddOptions(Of EmailOptions)() _
+            '       .BindConfiguration(configSectionName) _
+            '       .ValidateDataAnnotations() _
+            '       .ValidateOnStart()
+            '
+            ' ただし VB.NET + Akka.Hosting 共存時は BC30521（オーバーロード解決失敗）が
+            ' 発生することがある。Microsoft.Extensions.Options と Microsoft.Extensions.Hosting
+            ' の両方が OptionsBuilderExtensions を拡張しており、VB.NET の厳格な
+            ' オーバーロード解決では同名拡張メソッドの衝突と判定されるため。
+            ' C# では発生しない（緩い解決規則のため）。
+            '
+            ' 回避策として、Microsoft.Extensions.Hosting が提供する
+            ' `AddOptionsWithValidateOnStart(Of T)()` を使えばチェーン末尾の
+            ' `.ValidateOnStart()` を省略できる。こちらは .NET 8 以降で利用可能。
             services.AddOptionsWithValidateOnStart(Of EmailOptions)() _
                 .BindConfiguration(configSectionName) _
                 .ValidateDataAnnotations()

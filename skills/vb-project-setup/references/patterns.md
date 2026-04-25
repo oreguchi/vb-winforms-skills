@@ -54,12 +54,20 @@
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
     <LangVersion>latest</LangVersion>
-    <!-- VB.NET の Nullable 参照型は C# より制限的。
-         値型の Nullable(Of T) / T? は通常どおり使用可能。
-         参照型の null 許容は Nothing で暗黙的に許容される。
-         プロジェクト単位で <Nullable>enable</Nullable> を設定することは可能だが
-         VB.NET では C# ほど厳密なフローチェックは行われない。 -->
-    <Nullable>enable</Nullable>
+
+    <!-- VB.NET では <Nullable>enable</Nullable> を通常は使わない。
+         理由:
+           - VB.NET は C# のような null 許容参照型のフロー解析を持たない
+             （enable にしても静的チェック効果が限定的）
+           - 参照型の null 許容は `Nothing` で暗黙的に表現する
+           - 値型は従来どおり `Nullable(Of T)` / `T?` を使う
+           - 代わりに Option Strict/Infer/Explicit を徹底するのが VB.NET 流の堅牢化
+         必要なら個別プロジェクトで試せるが、デフォルトは非設定を推奨。 -->
+    <OptionStrict>On</OptionStrict>
+    <OptionInfer>On</OptionInfer>
+    <OptionExplicit>On</OptionExplicit>
+    <OptionCompare>Binary</OptionCompare>
+
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <WarningsAsErrors />
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
@@ -91,7 +99,8 @@
   <!-- 共有デフォルト -->
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
+    <!-- VB.NET では <Nullable>enable</Nullable> は使用しない（基本テンプレート参照） -->
+    <OptionStrict>On</OptionStrict>
   </PropertyGroup>
 
   <!-- テストプロジェクトのデフォルト -->

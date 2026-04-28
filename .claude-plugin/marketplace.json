@@ -1,5 +1,5 @@
 {
-  "name": "vb-winforms-skills-v2-local",
+  "name": "vb-winforms-skills-marketplace",
   "owner": {
     "name": "oreguchi",
     "email": "228712732+oreguchi@users.noreply.github.com"
@@ -8,7 +8,7 @@
     {
       "name": "vb-winforms-skills",
       "source": "./",
-      "description": "VB.NET/.NET 向け Claude Code スキル集 (2.2.0)。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理、DI パターン、OpenTelemetry 計装を 6 つのスキルで提供。v2.2 で OpenTelemetry 計装スキル（VB.NET + WinForms 補足付き）を追加。"
+      "description": "VB.NET/.NET 向け Claude Code スキル集 (2.2.1)。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理、DI パターン、OpenTelemetry 計装を 6 つのスキルで提供。v2.2.1 で marketplace 名を v2-local から marketplace 規則に修正（公開アーティファクトの命名統一）。"
     }
   ]
 }

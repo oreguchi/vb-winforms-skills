@@ -1,6 +1,6 @@
 {
   "name": "vb-winforms-skills",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "description": "VB.NET/.NET 向け Claude Code スキル集。Windows Forms、プロジェクト構成、モダン VB コーディング標準、並行処理パターン、依存性注入パターン、OpenTelemetry 計装を 6 つのスキルで提供。skill-conversion プラグイン経由で managedcode-dotnet-skills および dotnet-skills (C#) から VB.NET + 日本語に変換。",
   "author": {
     "name": "oreguchi",

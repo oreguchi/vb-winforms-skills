@@ -28,11 +28,9 @@ Claude Code 起動後、以下を順に実行：
 
 ```text
 /plugin marketplace add oreguchi/vb-winforms-skills
-/plugin install vb-winforms-skills@vb-winforms-skills-v2-local
+/plugin install vb-winforms-skills@vb-winforms-skills-marketplace
 /reload-plugins
 ```
-
-> **注**：マーケットプレイス名が `vb-winforms-skills-v2-local` となっているのは履歴上の経緯（local development からそのまま昇格）です。public 配信でもこの名前で動作します。
 
 ### 30 秒で試す
 

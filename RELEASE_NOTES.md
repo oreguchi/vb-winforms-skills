@@ -1,5 +1,34 @@
 # Release Notes
 
+## 2.2.1 — 2026-04-28
+
+**Patch: marketplace 名を `vb-winforms-skills-v2-local` から `vb-winforms-skills-marketplace` に修正**。
+
+### 変更概要
+
+v2.0.0 で誤って `vb-winforms-skills-v2-local`（local development の残骸）に rename されていた marketplace 名を、本来の規則 `vb-winforms-skills-marketplace` に戻しました。public 配信用としては `-local` サフィックスは不適切で、過去の v1.0.0 までの命名と一貫させるための修正です。
+
+### 既存ユーザへの影響（v2.2.0 を `-v2-local` 名でインストール済みの場合）
+
+以下の手順で再インストールしてください：
+
+```
+/plugin uninstall vb-winforms-skills@vb-winforms-skills-v2-local
+/plugin marketplace remove vb-winforms-skills-v2-local
+/plugin marketplace add oreguchi/vb-winforms-skills
+/plugin install vb-winforms-skills@vb-winforms-skills-marketplace
+/reload-plugins
+```
+
+スキル本体・機能・API には変更なし。インストール identifier のみの変更です。
+
+### 影響範囲
+
+- v2.2.0 公開から本 patch までの 1 時間程度に install したユーザのみ移行が必要
+- v2.0.0 / v2.1.0 を `-v2-local` 名でインストール済みのユーザ（過去にも該当）も同様の手順で `-marketplace` 名に移行可能
+
+---
+
 ## 2.2.0 — 2026-04-28
 
 **Minor: skill-conversion v1.0.1 ドッグフーディング成果としての OpenTelemetry 計装スキル追加**。下位互換あり（既存利用者への破壊的変更なし）。

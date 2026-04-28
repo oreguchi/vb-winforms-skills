@@ -1,5 +1,45 @@
 # Release Notes
 
+## 2.2.0 — 2026-04-28
+
+**Minor: skill-conversion v1.0.1 ドッグフーディング成果としての OpenTelemetry 計装スキル追加**。下位互換あり（既存利用者への破壊的変更なし）。
+
+### 変更概要
+
+`dotnet-skills:OpenTelemetry-NET-Instrumentation` v1.0.0（C#/EN）を skill-conversion v1.0.1（high-utility profile）で VB.NET + 日本語に変換した成果物を新規スキルとして取り込み。Phase 0–5 完走、Phase 5 fresh-session で 3/3 auto-fire PASS、独立 fresh-session レビューで「実用品質に到達」と判定済み。
+
+### 新規スキル
+
+- **`opentelemetry-net-instrumentation-vb-ja`**：VB.NET コードベースで OpenTelemetry 計装（トレース・メトリクス・命名規則・エラー処理・性能・API 設計）を実装するための指針。
+  - 中核：ソース 17 コードブロック・全節を VB.NET 構文に完全変換（`Using ... End Using`、`Async Function ... As Task`、`KeyValuePair(Of String, Object)` 等）
+  - 補強：`references/winforms-supplement.md`（~330 行）に WinForms 特有の補足
+    - **§SDK セットアップ**：Generic Host 経由（`AddOpenTelemetry().WithTracing/WithMetrics`、`AddSqlClientInstrumentation`、`AddHttpClientInstrumentation`）と `Sdk.CreateTracerProviderBuilder` 直接版の両方
+    - **§UI スレッドと Activity の境界**：`Async Sub` vs `Async Function ... As Task`、`Control.Invoke` 越境時の `Activity.Current` 不可視と明示キャプチャ対策、`InvalidOperationException`（クロススレッド）罠
+    - **§長期稼働時のライフサイクル管理**：`ActivitySource`/`Meter` シングルトン化、`IHostedService`/`Application.ApplicationExit` での flush + Dispose、カーディナリティ累積
+  - VB.NET 固有の落とし穴：`Dim activity As Activity = Activity.Current`（変数名と型名衝突回避）、`appHost`/完全修飾化（`Microsoft.Extensions.Hosting.Host` との衝突回避）、`ApplicationConfiguration.Initialize()` 不在の代替（`SetHighDpiMode`+`EnableVisualStyles`+`SetCompatibleTextRenderingDefault`）等を明記
+- `invocable: true`（auto-fire 対応）
+
+### ドリフト概要（新規スキル分）
+
+- 承認追加 11 件（minor: 6 / moderate: 3 / heavy: 3）
+  - Phase 1: 0 / Phase 2: 4 / Phase 3: 1 / Phase 4: 4 / Post-Phase-5 review: 2
+- 全件 catalog 駆動 + register 監査済み、削除/歪曲なし（加算方向のみ）
+- ドリフト判定：MODERATE（high-utility profile による Tier 2/3 取り込みが主因）
+
+### 累計
+
+- v2.0.0 までの累計: 19 件
+- v2.1.0 で追加: 7 件
+- **v2.2.0 で追加: 11 件**
+- **合計: 37 件**
+
+### v2.1.0 との互換性
+
+- 既存 5 スキルの API・名前・`invocable` 値はすべて維持
+- 追加のみで削除なし → 利用者から見て破壊的変更なし
+
+---
+
 ## 2.1.0 — 2026-04-24
 
 **Minor: バリアント比較レビュー（2026-04-24）の指摘を反映、1.0.0 の WinForms 特化章を統合**。下位互換あり（既存利用者への破壊的変更なし）。
